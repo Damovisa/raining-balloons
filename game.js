@@ -408,8 +408,16 @@ function drawCard() {
     updateDeckCount();
 
     animateCardDeal(card, () => {
-        state.drawnCard = card;
-        state.turnPhase = 'action';
+        if (card === CARD_TYPES.REDO) {
+            // Auto-hold — no decision needed
+            state.redoQueue.push(state.currentPlayerIndex);
+            toast(`${PLAYER_NAMES[state.currentPlayerIndex]} drew Redo and is holding it! 🔄`);
+            state.drawnCard = null;
+            state.turnPhase = 'done';
+        } else {
+            state.drawnCard = card;
+            state.turnPhase = 'action';
+        }
         renderAll();
     });
 }
@@ -507,13 +515,6 @@ function useCard() {
         case CARD_TYPES.BUNKER_KEY:
             startBunkerAction();
             break;
-        case CARD_TYPES.REDO:
-            state.redoQueue.push(state.currentPlayerIndex);
-            toast(`${PLAYER_NAMES[state.currentPlayerIndex]} holds a Redo card! 🔄`);
-            state.drawnCard = null;
-            state.turnPhase = 'done';
-            renderAll();
-            break;
     }
 }
 
@@ -523,10 +524,52 @@ function discardCard() {
     state.turnPhase = 'done';
     clearSelection();
     renderAll();
+    startEndTurnTimer();
+}
+
+let endTurnTimer = null;
+let endTurnTimerStart = null;
+
+function startEndTurnTimer() {
+    cancelEndTurnTimer();
+    endTurnTimerStart = Date.now();
+    renderTimerBar(3);
+
+    endTurnTimer = setInterval(() => {
+        const elapsed = (Date.now() - endTurnTimerStart) / 1000;
+        const remaining = 3 - elapsed;
+        if (remaining <= 0) {
+            cancelEndTurnTimer();
+            endTurn();
+        } else {
+            renderTimerBar(remaining);
+        }
+    }, 50);
+}
+
+function cancelEndTurnTimer() {
+    if (endTurnTimer) {
+        clearInterval(endTurnTimer);
+        endTurnTimer = null;
+    }
+    renderTimerBar(null);
+}
+
+function renderTimerBar(secondsLeft) {
+    const bar = document.getElementById('end-turn-timer-bar');
+    if (!bar) return;
+    if (secondsLeft === null) {
+        bar.style.display = 'none';
+        bar.style.width = '0%';
+        return;
+    }
+    bar.style.display = 'block';
+    bar.style.width = `${(secondsLeft / 3) * 100}%`;
 }
 
 function endTurn() {
     if (state.turnPhase !== 'done') return;
+    cancelEndTurnTimer();
 
     // Track who started this round (first non-eliminated player)
     if (state.roundStartPlayer === undefined) {
@@ -607,9 +650,9 @@ function handleMoveClick(row, col) {
         if (peepIdx !== undefined) {
             state.selectedPeepIdx = peepIdx;
             state.selectionMode = 'select_move_target';
-            // Show valid move targets (adjacent squares)
+            // Show valid move targets (adjacent squares, excluding bunkers)
             const peep = player.peeps[peepIdx];
-            state.moveTargets = getAdjacentCells(peep.row, peep.col);
+            state.moveTargets = getAdjacentCells(peep.row, peep.col, true);
             renderAll();
         }
     } else if (state.selectionMode === 'select_move_target') {
@@ -636,12 +679,13 @@ function handleMoveClick(row, col) {
     }
 }
 
-function getAdjacentCells(row, col) {
+function getAdjacentCells(row, col, excludeBunkers = false) {
     const cells = [];
     const dirs = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]];
     dirs.forEach(([dr, dc]) => {
         const r = row + dr, c = col + dc;
         if (r >= 0 && r < 8 && c >= 0 && c < 8) {
+            if (excludeBunkers && state.bunkers.some(b => b.row === r && b.col === c)) return;
             cells.push({ row: r, col: c });
         }
     });
@@ -813,6 +857,7 @@ function finishCardAction() {
     state.turnPhase = 'done';
     clearSelection();
     renderAll();
+    startEndTurnTimer();
 }
 
 function clearSelection() {
@@ -1022,7 +1067,7 @@ function advanceRound() {
     state.currentPlayerIndex = state.players.findIndex(p => !p.eliminated);
     state.turnPhase = 'draw';
     state.drawnCard = null;
-
+    cancelEndTurnTimer();
     document.getElementById('round-num').textContent = state.round;
     clearSelection();
     renderAll();
