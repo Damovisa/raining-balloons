@@ -83,6 +83,14 @@ body {
     transform: translateY(-2px);
 }
 
+.opt-btn.disabled,
+.opt-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    transform: none;
+    border-color: #ddd;
+}
+
 .opt-btn.selected {
     background: #764ba2;
     color: white;

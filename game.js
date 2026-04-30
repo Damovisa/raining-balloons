@@ -115,11 +115,35 @@ document.addEventListener('DOMContentLoaded', () => {
 function setupOptionButtons() {
     document.querySelectorAll('.opt-btn').forEach(btn => {
         btn.addEventListener('click', () => {
+            if (btn.disabled) return;
             const group = btn.dataset.option;
             document.querySelectorAll(`[data-option="${group}"]`).forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
+            if (group === 'players') updateBunkerOptions();
         });
     });
+    updateBunkerOptions();
+}
+
+function updateBunkerOptions() {
+    const numPlayers = parseInt(document.querySelector('[data-option="players"].selected').dataset.value);
+    const maxBunkers = Math.min(numPlayers * 3 - 2, 8);
+
+    let selectedBunkerVal = parseInt(document.querySelector('[data-option="bunkers"].selected')?.dataset.value ?? 4);
+
+    document.querySelectorAll('[data-option="bunkers"]').forEach(btn => {
+        const val = parseInt(btn.dataset.value);
+        const valid = val <= maxBunkers;
+        btn.disabled = !valid;
+        btn.classList.toggle('disabled', !valid);
+        if (!valid) btn.classList.remove('selected');
+    });
+
+    // If current selection is now invalid, pick highest valid
+    if (selectedBunkerVal > maxBunkers) {
+        const highest = [...document.querySelectorAll('[data-option="bunkers"]:not([disabled])')].pop();
+        if (highest) highest.classList.add('selected');
+    }
 }
 
 function startGame() {
