@@ -59,11 +59,19 @@
                 </div>
                 <div class="right-panel">
                     <div id="card-area">
-                        <h3>Current Card</h3>
-                        <div id="drawn-card" class="card-display empty">
-                            <p>Draw a card to begin your turn</p>
+                        <h3 id="card-area-title">Card Deck</h3>
+                        <div id="card-deck-wrapper">
+                            <div id="card-deck" class="card-deck" title="Click deck to draw">
+                                <div class="deck-layer"></div>
+                                <div class="deck-layer"></div>
+                                <div class="deck-layer"></div>
+                                <div class="deck-top">🎴</div>
+                            </div>
+                            <div class="deck-count-label"><span id="deck-count">36</span> cards left</div>
                         </div>
-                        <button id="draw-card-btn" class="action-btn">🃏 Draw Card</button>
+                        <div id="drawn-card" class="card-display empty">
+                            <p>Click the deck to draw</p>
+                        </div>
                         <button id="use-card-btn" class="action-btn hidden">✅ Use Card</button>
                         <button id="discard-btn" class="action-btn hidden">❌ Discard</button>
                         <button id="end-turn-btn" class="action-btn hidden">➡️ End Turn</button>

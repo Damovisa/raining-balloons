@@ -416,8 +416,115 @@ body {
     margin-bottom: 30px;
 }
 
-/* Round controls */
-#round-controls {
+/* Card Deck */
+#card-deck-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.card-deck {
+    position: relative;
+    width: 80px;
+    height: 112px;
+    cursor: pointer;
+    margin: 0 auto;
+    transition: opacity 0.3s;
+}
+
+.card-deck.deck-disabled {
+    opacity: 0.4;
+    cursor: default;
+    pointer-events: none;
+}
+
+.deck-layer {
+    position: absolute;
+    width: 80px;
+    height: 112px;
+    border-radius: 10px;
+    background: linear-gradient(145deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    border: 2px solid rgba(255,255,255,0.15);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+}
+
+.deck-layer:nth-child(1) { transform: translate(-4px, -4px) rotate(-3deg); }
+.deck-layer:nth-child(2) { transform: translate(-2px, -2px) rotate(-1.5deg); }
+.deck-layer:nth-child(3) { transform: translate(0, 0); }
+
+.deck-top {
+    position: absolute;
+    width: 80px;
+    height: 112px;
+    border-radius: 10px;
+    background: linear-gradient(145deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    border: 2px solid rgba(255,255,255,0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.2rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    transition: transform 0.2s ease;
+}
+
+.card-deck:hover:not(.deck-disabled) .deck-top {
+    transform: translateY(-6px);
+}
+
+.deck-count-label {
+    color: #666;
+    font-size: 0.8rem;
+    margin-top: 8px;
+}
+
+/* Flying card animation */
+.flying-card {
+    position: fixed;
+    border-radius: 10px;
+    pointer-events: none;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.5);
+    background: linear-gradient(145deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    border: 2px solid rgba(255,255,255,0.25);
+    font-size: 2rem;
+    color: white;
+    overflow: hidden;
+}
+
+.flying-card.in-flight {
+    transition:
+        left 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+        top 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+        width 0.45s ease,
+        height 0.45s ease;
+}
+
+.flying-card.sliding {
+    transition:
+        left 0.3s ease-in-out,
+        top 0.3s ease-in-out,
+        width 0.3s ease,
+        height 0.3s ease;
+}
+
+.flying-card .fcard-inner {
+    text-align: center;
+    padding: 8px;
+}
+
+.flying-card .fcard-icon { font-size: 2rem; }
+.flying-card .fcard-name {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #333;
+    margin-top: 4px;
+}
+
+
     margin-top: 15px;
     text-align: center;
 }

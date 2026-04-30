@@ -99,7 +99,7 @@ let state = {
 document.addEventListener('DOMContentLoaded', () => {
     setupOptionButtons();
     document.getElementById('start-game').addEventListener('click', startGame);
-    document.getElementById('draw-card-btn').addEventListener('click', drawCard);
+    document.getElementById('card-deck').addEventListener('click', drawCard);
     document.getElementById('use-card-btn').addEventListener('click', useCard);
     document.getElementById('discard-btn').addEventListener('click', discardCard);
     document.getElementById('end-turn-btn').addEventListener('click', endTurn);
@@ -156,9 +156,12 @@ function startGame() {
     state.splashedCells = [];
     state.redoHolders = [];
     state.gameOver = false;
+    state.roundStartPlayer = undefined;
+    state.preDrop = null;
 
     showScreen('game-screen');
     renderAll();
+    updateDeckCount();
 }
 
 // ==============================
@@ -232,6 +235,7 @@ function renderPlayerStatus() {
     state.players.forEach((player, i) => {
         const card = document.createElement('div');
         card.className = 'player-card';
+        card.id = `player-card-${i}`;
         if (i === state.currentPlayerIndex && !isRoundEndPhase()) card.classList.add('active-player');
         if (player.eliminated) card.classList.add('eliminated');
 
@@ -280,48 +284,60 @@ function getSelectionPrompt() {
 }
 
 function renderCardArea() {
-    const drawBtn = document.getElementById('draw-card-btn');
+    const deck = document.getElementById('card-deck');
     const useBtn = document.getElementById('use-card-btn');
     const discardBtn = document.getElementById('discard-btn');
     const endTurnBtn = document.getElementById('end-turn-btn');
     const cardDisplay = document.getElementById('drawn-card');
+    const title = document.getElementById('card-area-title');
+    const deckWrapper = document.getElementById('card-deck-wrapper');
+    const playerColors = ['#E74C3C', '#3498DB', '#27AE60', '#F39C12'];
 
     if (isRoundEndPhase() || state.gameOver) {
-        drawBtn.classList.add('hidden');
+        if (deck) deck.classList.add('deck-disabled');
         useBtn.classList.add('hidden');
         discardBtn.classList.add('hidden');
         endTurnBtn.classList.add('hidden');
         cardDisplay.className = 'card-display empty';
         cardDisplay.innerHTML = '<p>Waiting for round end...</p>';
+        cardDisplay.style.borderColor = '';
+        if (title) title.textContent = 'Card Deck';
         return;
     }
 
+    const pName = PLAYER_NAMES[state.currentPlayerIndex];
+    const pColor = playerColors[state.currentPlayerIndex];
+    if (title) title.textContent = `${PLAYER_EMOJIS[state.currentPlayerIndex]} ${pName}'s Turn`;
+
     if (state.turnPhase === 'draw') {
-        drawBtn.classList.remove('hidden');
+        if (deck) deck.classList.remove('deck-disabled');
         useBtn.classList.add('hidden');
         discardBtn.classList.add('hidden');
         endTurnBtn.classList.add('hidden');
         cardDisplay.className = 'card-display empty';
-        cardDisplay.innerHTML = '<p>Draw a card to begin your turn</p>';
+        cardDisplay.innerHTML = '<p>Click the deck to draw</p>';
+        cardDisplay.style.borderColor = '';
     } else if (state.turnPhase === 'action') {
-        drawBtn.classList.add('hidden');
+        if (deck) deck.classList.add('deck-disabled');
         useBtn.classList.remove('hidden');
         discardBtn.classList.remove('hidden');
         endTurnBtn.classList.add('hidden');
         const info = CARD_INFO[state.drawnCard];
         cardDisplay.className = 'card-display';
+        cardDisplay.style.borderColor = pColor;
         cardDisplay.innerHTML = `
             <div class="card-icon">${info.icon}</div>
             <div class="card-name">${info.name}</div>
             <div class="card-desc">${info.desc}</div>
         `;
     } else if (state.turnPhase === 'done') {
-        drawBtn.classList.add('hidden');
+        if (deck) deck.classList.add('deck-disabled');
         useBtn.classList.add('hidden');
         discardBtn.classList.add('hidden');
         endTurnBtn.classList.remove('hidden');
         cardDisplay.className = 'card-display empty';
         cardDisplay.innerHTML = '<p>Turn complete</p>';
+        cardDisplay.style.borderColor = '';
     }
 }
 
@@ -358,14 +374,93 @@ function isRoundEndPhase() {
 function drawCard() {
     if (state.turnPhase !== 'draw') return;
 
-    // Reshuffle if empty
-    if (state.deck.length === 0) {
-        state.deck = buildDeck();
-    }
+    const deckEl = document.getElementById('card-deck');
+    if (deckEl) deckEl.classList.add('deck-disabled');
 
-    state.drawnCard = state.deck.pop();
-    state.turnPhase = 'action';
-    renderAll();
+    if (state.deck.length === 0) state.deck = buildDeck();
+    const card = state.deck.pop();
+    updateDeckCount();
+
+    animateCardDeal(card, () => {
+        state.drawnCard = card;
+        state.turnPhase = 'action';
+        renderAll();
+    });
+}
+
+function updateDeckCount() {
+    const el = document.getElementById('deck-count');
+    if (el) el.textContent = state.deck.length;
+}
+
+function animateCardDeal(card, onComplete) {
+    const deckEl = document.getElementById('card-deck');
+    const playerCardEl = document.getElementById(`player-card-${state.currentPlayerIndex}`);
+    const drawnCardEl = document.getElementById('drawn-card');
+    const info = CARD_INFO[card];
+    const playerColors = ['#E74C3C', '#3498DB', '#27AE60', '#F39C12'];
+
+    if (!deckEl || !playerCardEl || !drawnCardEl) { onComplete(); return; }
+
+    const deckRect = deckEl.getBoundingClientRect();
+    const playerRect = playerCardEl.getBoundingClientRect();
+    const drawnRect = drawnCardEl.getBoundingClientRect();
+
+    // Card starts at deck size
+    const cw = deckRect.width, ch = deckRect.height;
+
+    const flying = document.createElement('div');
+    flying.className = 'flying-card';
+    Object.assign(flying.style, {
+        left: deckRect.left + 'px',
+        top: deckRect.top + 'px',
+        width: cw + 'px',
+        height: ch + 'px',
+    });
+    flying.innerHTML = '🎴';
+    document.body.appendChild(flying);
+
+    // Phase 1: Fly face-down to the player's panel
+    const destX = playerRect.left + playerRect.width / 2 - cw / 2;
+    const destY = playerRect.top + playerRect.height / 2 - ch / 2;
+
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        flying.classList.add('in-flight');
+        flying.style.left = destX + 'px';
+        flying.style.top = destY + 'px';
+    }));
+
+    // Phase 2: Flip to reveal at player position
+    setTimeout(() => {
+        flying.classList.remove('in-flight');
+        flying.style.transition = 'transform 0.12s ease-in';
+        flying.style.transform = 'scaleX(0)';
+
+        setTimeout(() => {
+            // Show card face
+            const pColor = playerColors[state.currentPlayerIndex];
+            flying.style.background = `linear-gradient(135deg, #ffecd2, #fcb69f)`;
+            flying.style.border = `3px solid ${pColor}`;
+            flying.style.color = '#333';
+            flying.innerHTML = `<div class="fcard-inner"><div class="fcard-icon">${info.icon}</div><div class="fcard-name">${info.name}</div></div>`;
+            flying.style.transition = 'transform 0.15s ease-out';
+            flying.style.transform = 'scaleX(1)';
+
+            // Phase 3: Slide to drawn-card display
+            setTimeout(() => {
+                flying.classList.add('sliding');
+                flying.style.left = drawnRect.left + 'px';
+                flying.style.top = drawnRect.top + 'px';
+                flying.style.width = drawnRect.width + 'px';
+                flying.style.height = drawnRect.height + 'px';
+
+                setTimeout(() => {
+                    flying.remove();
+                    onComplete();
+                }, 320);
+            }, 450);
+        }, 120);
+    }, 500);
 }
 
 function useCard() {
