@@ -165,6 +165,7 @@ function startGame() {
     state.preDrop = null;
 
     showScreen('game-screen');
+    enforceBunkerCap();
     renderAll();
     updateDeckCount();
 }
@@ -998,7 +999,33 @@ function applyBalloonDamage(hits) {
         }
     });
 
+    enforceBunkerCap();
     checkWinCondition();
+}
+
+// Bunkers must always be at least 2 fewer than alive peeps.
+// Remove random bunkers until the gap is restored.
+function enforceBunkerCap() {
+    const alivePeeps = state.players.reduce(
+        (n, p) => n + p.peeps.filter(peep => peep.alive).length, 0
+    );
+
+    while (state.bunkers.length > alivePeeps - 2 && state.bunkers.length > 0) {
+        const idx = Math.floor(Math.random() * state.bunkers.length);
+        const bunker = state.bunkers[idx];
+
+        // Eject occupant if present
+        if (bunker.occupant) {
+            const player = state.players[bunker.occupant.playerIndex];
+            const peep = player.peeps[bunker.occupant.peepIndex];
+            peep.inBunker = false;
+            toast(`A bunker was destroyed — ${PLAYER_NAMES[bunker.occupant.playerIndex]}'s peep was ejected! 💥`);
+        } else {
+            toast('A bunker was destroyed! 💥');
+        }
+
+        state.bunkers.splice(idx, 1);
+    }
 }
 
 // Animate each hit peep: splash burst floating up, then callback
