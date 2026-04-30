@@ -827,32 +827,6 @@ function clearSelection() {
 function dropBalloons() {
     // Save state before damage for redo
     state.preDrop = {
-        players: JSON.parse(JSON.stringify(state.players))
-    };
-
-    const cells = [];
-    const used = new Set();
-
-    while (cells.length < state.numBalloons) {
-        const row = Math.floor(Math.random() * 8);
-        const col = Math.floor(Math.random() * 8);
-        const key = `${row},${col}`;
-        if (!used.has(key)) {
-            used.add(key);
-            cells.push({ row, col });
-        }
-    }
-
-    state.splashedCells = cells;
-
-    // Apply damage
-    applyBalloonDamage();
-    renderAll();
-}
-
-function dropBalloons() {
-    // Save state before damage for redo
-    state.preDrop = {
         players: JSON.parse(JSON.stringify(state.players)),
         bunkers: JSON.parse(JSON.stringify(state.bunkers))
     };
@@ -873,35 +847,105 @@ function dropBalloons() {
     state.splashedCells = cells;
     state.redoQueuePos = 0;
 
-    applyBalloonDamage();
-    renderAll();
+    // Collect hits before applying damage, so we can animate them
+    const hits = collectHits();
+
+    // Render splash cells first (peeps still shown)
+    renderBoard();
+    renderPlayerStatus();
+    renderTurnInfo();
+    renderCardArea();
+    renderRoundControls();
+
+    // Animate hits, then apply damage after animations
+    if (hits.length > 0) {
+        animateHits(hits, () => {
+            applyBalloonDamage(hits);
+            renderAll();
+        });
+    } else {
+        applyBalloonDamage(hits);
+        renderAll();
+    }
 }
 
-function applyBalloonDamage() {
+// Figure out which peeps will be hit without killing them yet
+function collectHits() {
+    const hits = [];
     state.splashedCells.forEach(({ row, col }) => {
-        state.players.forEach(player => {
-            player.peeps.forEach(peep => {
+        state.players.forEach((player, pi) => {
+            player.peeps.forEach((peep, peepIdx) => {
                 if (!peep.alive || peep.row !== row || peep.col !== col) return;
                 if (peep.inBunker) return;
-                if (peep.hasUmbrella) {
-                    peep.hasUmbrella = false;
-                    toast(`An umbrella saved a peep! ☂️💧`);
-                    return;
-                }
-                peep.alive = false;
+                hits.push({ row, col, playerIndex: pi, peepIndex: peepIdx, absorbed: peep.hasUmbrella });
             });
         });
+    });
+    return hits;
+}
+
+function applyBalloonDamage(hits) {
+    hits.forEach(({ playerIndex, peepIndex, absorbed }) => {
+        const peep = state.players[playerIndex].peeps[peepIndex];
+        if (absorbed) {
+            peep.hasUmbrella = false;
+        } else {
+            peep.alive = false;
+        }
     });
 
     // Check eliminations
     state.players.forEach((player, i) => {
         if (!player.eliminated && player.peeps.every(p => !p.alive)) {
             player.eliminated = true;
-            toast(`${PLAYER_NAMES[i]} has been eliminated! 💀`);
+            toast(`${PLAYER_NAMES[i]} is eliminated! 💀`);
         }
     });
 
     checkWinCondition();
+}
+
+// Animate each hit peep: splash burst floating up, then callback
+function animateHits(hits, onComplete) {
+    const board = document.getElementById('board');
+    if (!board) { onComplete(); return; }
+
+    let done = 0;
+    const playerColors = ['#E74C3C', '#3498DB', '#27AE60', '#F39C12'];
+
+    hits.forEach(({ row, col, playerIndex, absorbed }, i) => {
+        // Find the cell element
+        const cell = board.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+        if (!cell) { if (++done === hits.length) onComplete(); return; }
+
+        const rect = cell.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+
+        const el = document.createElement('div');
+        el.className = 'hit-burst';
+        el.style.left = cx + 'px';
+        el.style.top = cy + 'px';
+        el.style.color = playerColors[playerIndex];
+
+        if (absorbed) {
+            el.innerHTML = `☂️<span class="hit-spray">💦</span>`;
+            el.title = 'Umbrella saved!';
+        } else {
+            el.innerHTML = `${PLAYER_EMOJIS[playerIndex]}<span class="hit-spray">💦</span>`;
+        }
+
+        document.body.appendChild(el);
+
+        // Stagger each burst slightly
+        setTimeout(() => {
+            el.classList.add('hit-burst-go');
+            setTimeout(() => {
+                el.remove();
+                if (++done === hits.length) onComplete();
+            }, 900);
+        }, i * 120);
+    });
 }
 
 function checkWinCondition() {
