@@ -16,7 +16,7 @@ const CARD_INFO = {
     [CARD_TYPES.MOVE]: { icon: '👟', name: 'Move', desc: 'Move all your peeps one square' },
     [CARD_TYPES.UMBRELLA]: { icon: '☂️', name: 'Paper Umbrella', desc: 'Equip one peep with an umbrella (absorbs 1 balloon)' },
     [CARD_TYPES.STEAL_UMBRELLA]: { icon: '🫳', name: 'Steal Umbrella', desc: 'Steal an umbrella from another player\'s peep' },
-    [CARD_TYPES.BUNKER_KEY]: { icon: '🔑', name: 'Bunker Key', desc: 'Enter a bunker if your peep is adjacent to one' },
+    [CARD_TYPES.BUNKER_KEY]: { icon: '🔑', name: 'Bunker Key', desc: 'Enter a bunker if your peep is adjacent (stay for 3 rounds)' },
     [CARD_TYPES.REDO]: { icon: '🔄', name: 'Redo', desc: 'Hold until end of round — cancel balloon drop and re-roll' }
 };
 
@@ -90,7 +90,9 @@ let state = {
     selectionCallback: null,
     gameOver: false,
     roundStartPlayer: undefined,
-    preDrop: null
+    preDrop: null,
+    redoQueue: [],      // ordered list of playerIndex holding redo cards
+    redoQueuePos: 0     // which position in redoQueue is currently deciding
 };
 
 // ==============================
@@ -104,8 +106,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('discard-btn').addEventListener('click', discardCard);
     document.getElementById('end-turn-btn').addEventListener('click', endTurn);
     document.getElementById('drop-balloons-btn').addEventListener('click', dropBalloons);
-    document.getElementById('redo-btn').addEventListener('click', redoBalloons);
-    document.getElementById('accept-drop-btn').addEventListener('click', acceptDrop);
+    document.getElementById('redo-btn').addEventListener('click', useRedo);
+    document.getElementById('accept-drop-btn').addEventListener('click', passRedo);
     document.getElementById('play-again-btn').addEventListener('click', () => location.reload());
 });
 
@@ -155,6 +157,8 @@ function startGame() {
     state.drawnCard = null;
     state.splashedCells = [];
     state.redoHolders = [];
+    state.redoQueue = [];
+    state.redoQueuePos = 0;
     state.gameOver = false;
     state.roundStartPlayer = undefined;
     state.preDrop = null;
@@ -196,6 +200,11 @@ function renderBoard() {
                     peepEl.className = `peep player-${p + 1}`;
                     peepEl.textContent = PLAYER_EMOJIS[p];
                     cell.appendChild(peepEl);
+                    // Show turns remaining
+                    const badge = document.createElement('span');
+                    badge.className = 'bunker-timer';
+                    badge.textContent = bunker.occupant.turnsLeft;
+                    cell.appendChild(badge);
                 }
             }
 
@@ -250,7 +259,7 @@ function renderPlayerStatus() {
                 ${umbrellas ? ` | ☂️×${umbrellas}` : ''}
                 ${inBunkers ? ` | 🏠×${inBunkers}` : ''}
             </div>
-            ${state.redoHolders.includes(i) ? '<span class="redo-badge">🔄 Redo Ready</span>' : ''}
+            ${state.redoQueue.includes(i) ? '<span class="redo-badge">🔄 Redo Ready</span>' : ''}
         `;
         container.appendChild(card);
     });
@@ -345,17 +354,34 @@ function renderRoundControls() {
     const roundCtrl = document.getElementById('round-controls');
     const redoCtrl = document.getElementById('redo-controls');
     const redoBtn = document.getElementById('redo-btn');
+    const passBtn = document.getElementById('accept-drop-btn');
 
     if (isRoundEndPhase() && state.splashedCells.length === 0) {
+        // Waiting to drop
         roundCtrl.classList.remove('hidden');
         redoCtrl.classList.add('hidden');
     } else if (isRoundEndPhase() && state.splashedCells.length > 0) {
         roundCtrl.classList.add('hidden');
-        redoCtrl.classList.remove('hidden');
-        if (state.redoHolders.length > 0) {
+        const decider = currentRedoDecider();
+        if (decider !== null) {
+            redoCtrl.classList.remove('hidden');
+            const info = document.getElementById('redo-deciding-info');
+            if (info) {
+                const others = state.redoQueue.length - state.redoQueuePos - 1;
+                info.innerHTML = `
+                    <strong>${PLAYER_EMOJIS[decider]} ${PLAYER_NAMES[decider]}</strong> — use your Redo card?
+                    ${others > 0 ? `<small>(${others} more player${others > 1 ? 's' : ''} to decide after you)</small>` : ''}
+                `;
+            }
             redoBtn.classList.remove('hidden');
+            passBtn.textContent = '👍 Pass';
         } else {
+            // No redo holders — just show accept
+            redoCtrl.classList.remove('hidden');
+            const info = document.getElementById('redo-deciding-info');
+            if (info) info.innerHTML = 'Balloons have fallen!';
             redoBtn.classList.add('hidden');
+            passBtn.textContent = '➡️ Next Round';
         }
     } else {
         roundCtrl.classList.add('hidden');
@@ -482,7 +508,7 @@ function useCard() {
             startBunkerAction();
             break;
         case CARD_TYPES.REDO:
-            state.redoHolders.push(state.currentPlayerIndex);
+            state.redoQueue.push(state.currentPlayerIndex);
             toast(`${PLAYER_NAMES[state.currentPlayerIndex]} holds a Redo card! 🔄`);
             state.drawnCard = null;
             state.turnPhase = 'done';
@@ -773,8 +799,8 @@ function onCellClick(row, col) {
                 peep.inBunker = true;
                 peep.row = bunker.row;
                 peep.col = bunker.col;
-                bunker.occupant = { playerIndex: state.currentPlayerIndex, peepIndex: target.peepIdx };
-                toast(`${PLAYER_NAMES[state.currentPlayerIndex]}'s peep entered a bunker! 🏠`);
+                bunker.occupant = { playerIndex: state.currentPlayerIndex, peepIndex: target.peepIdx, turnsLeft: 3 };
+                toast(`${PLAYER_NAMES[state.currentPlayerIndex]}'s peep entered a bunker for 3 rounds! 🏠`);
                 finishCardAction();
             }
         }
@@ -824,23 +850,44 @@ function dropBalloons() {
     renderAll();
 }
 
+function dropBalloons() {
+    // Save state before damage for redo
+    state.preDrop = {
+        players: JSON.parse(JSON.stringify(state.players)),
+        bunkers: JSON.parse(JSON.stringify(state.bunkers))
+    };
+
+    const cells = [];
+    const used = new Set();
+
+    while (cells.length < state.numBalloons) {
+        const row = Math.floor(Math.random() * 8);
+        const col = Math.floor(Math.random() * 8);
+        const key = `${row},${col}`;
+        if (!used.has(key)) {
+            used.add(key);
+            cells.push({ row, col });
+        }
+    }
+
+    state.splashedCells = cells;
+    state.redoQueuePos = 0;
+
+    applyBalloonDamage();
+    renderAll();
+}
+
 function applyBalloonDamage() {
     state.splashedCells.forEach(({ row, col }) => {
         state.players.forEach(player => {
             player.peeps.forEach(peep => {
                 if (!peep.alive || peep.row !== row || peep.col !== col) return;
-
-                // Check if in bunker — protected
                 if (peep.inBunker) return;
-
-                // Check umbrella
                 if (peep.hasUmbrella) {
                     peep.hasUmbrella = false;
                     toast(`An umbrella saved a peep! ☂️💧`);
                     return;
                 }
-
-                // Peep is hit!
                 peep.alive = false;
             });
         });
@@ -854,13 +901,16 @@ function applyBalloonDamage() {
         }
     });
 
-    // Check win condition
+    checkWinCondition();
+}
+
+function checkWinCondition() {
     const alive = state.players.filter(p => !p.eliminated);
     if (alive.length <= 1) {
         state.gameOver = true;
         setTimeout(() => {
             if (alive.length === 1) {
-                showGameOver(`${PLAYER_EMOJIS[alive[0].index]} ${PLAYER_NAMES[alive[0].index]} wins!`);
+                showGameOver(`${PLAYER_EMOJIS[alive[0].index]} ${PLAYER_NAMES[alive[0].index]} wins! 🎉`);
             } else {
                 showGameOver("It's a draw! Everyone got soaked! 💧");
             }
@@ -868,29 +918,63 @@ function applyBalloonDamage() {
     }
 }
 
-function redoBalloons() {
-    // Use the first available redo
-    const holderIdx = state.redoHolders.shift();
+// Returns the player currently deciding on the redo, or null if queue is exhausted
+function currentRedoDecider() {
+    if (state.redoQueuePos < state.redoQueue.length) {
+        return state.redoQueue[state.redoQueuePos];
+    }
+    return null;
+}
+
+function useRedo() {
+    const holderIdx = state.redoQueue[state.redoQueuePos];
     toast(`${PLAYER_NAMES[holderIdx]} used Redo! Re-dropping balloons... 🔄`);
 
-    // Restore peeps from pre-drop snapshot
+    // Restore pre-drop state
     if (state.preDrop) {
         state.players = JSON.parse(JSON.stringify(state.preDrop.players));
+        state.bunkers = JSON.parse(JSON.stringify(state.preDrop.bunkers));
     }
     state.splashedCells = [];
 
-    // Re-render then drop again
+    // Remove the used redo from queue; keep remaining holders for the new drop
+    state.redoQueue.splice(state.redoQueuePos, 1);
+    // redoQueuePos stays the same — it now points to the next undecided holder
+
     renderAll();
     setTimeout(() => dropBalloons(), 800);
 }
 
-function acceptDrop() {
-    // Move to next round
+function passRedo() {
+    state.redoQueuePos++;
+    if (currentRedoDecider() === null) {
+        // All redo holders have passed — advance to next round
+        advanceRound();
+    } else {
+        renderAll();
+    }
+}
+
+function advanceRound() {
+    // Decrement bunker timers and eject expired occupants
+    state.bunkers.forEach(bunker => {
+        if (!bunker.occupant) return;
+        bunker.occupant.turnsLeft--;
+        if (bunker.occupant.turnsLeft <= 0) {
+            const player = state.players[bunker.occupant.playerIndex];
+            const peep = player.peeps[bunker.occupant.peepIndex];
+            peep.inBunker = false;
+            toast(`${PLAYER_NAMES[bunker.occupant.playerIndex]}'s peep was ejected from the bunker! ⏰`);
+            bunker.occupant = null;
+        }
+    });
+
     state.round++;
     state.splashedCells = [];
-    state.redoHolders = [];
+    state.redoQueue = [];
+    state.redoQueuePos = 0;
+    state.preDrop = null;
 
-    // Find first non-eliminated player
     state.currentPlayerIndex = state.players.findIndex(p => !p.eliminated);
     state.turnPhase = 'draw';
     state.drawnCard = null;

@@ -533,6 +533,36 @@ body {
     margin-top: 10px;
 }
 
+/* Bunker timer badge */
+.bunker-timer {
+    position: absolute;
+    bottom: 2px;
+    right: 3px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: #fff;
+    background: rgba(0,0,0,0.55);
+    border-radius: 6px;
+    padding: 0 3px;
+    line-height: 1.3;
+    pointer-events: none;
+}
+
+/* Redo deciding info */
+.redo-info {
+    font-size: 0.85rem;
+    text-align: center;
+    margin-bottom: 8px;
+    color: #444;
+    line-height: 1.4;
+}
+
+.redo-info small {
+    display: block;
+    color: #888;
+    margin-top: 2px;
+}
+
 /* Responsive */
 @media (max-width: 900px) {
     .game-layout {
