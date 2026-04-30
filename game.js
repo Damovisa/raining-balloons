@@ -103,6 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('start-game').addEventListener('click', startGame);
     document.getElementById('card-deck').addEventListener('click', drawCard);
     document.getElementById('use-card-btn').addEventListener('click', useCard);
+    document.getElementById('done-moving-btn').addEventListener('click', finishCardAction);
     document.getElementById('discard-btn').addEventListener('click', discardCard);
     document.getElementById('end-turn-btn').addEventListener('click', endTurn);
     document.getElementById('drop-balloons-btn').addEventListener('click', dropBalloons);
@@ -296,17 +297,20 @@ function renderCardArea() {
     const deck = document.getElementById('card-deck');
     const useBtn = document.getElementById('use-card-btn');
     const discardBtn = document.getElementById('discard-btn');
-    const endTurnBtn = document.getElementById('end-turn-btn');
+    const doneMovingBtn = document.getElementById('done-moving-btn');
+    const endTurnWrap = document.getElementById('end-turn-timer-wrap');
     const cardDisplay = document.getElementById('drawn-card');
     const title = document.getElementById('card-area-title');
-    const deckWrapper = document.getElementById('card-deck-wrapper');
     const playerColors = ['#E74C3C', '#3498DB', '#27AE60', '#F39C12'];
+
+    const isMoving = state.selectionMode === 'select_peep_move' || state.selectionMode === 'select_move_target';
 
     if (isRoundEndPhase() || state.gameOver) {
         if (deck) deck.classList.add('deck-disabled');
         useBtn.classList.add('hidden');
         discardBtn.classList.add('hidden');
-        endTurnBtn.classList.add('hidden');
+        doneMovingBtn.classList.add('hidden');
+        if (endTurnWrap) endTurnWrap.classList.add('hidden');
         cardDisplay.className = 'card-display empty';
         cardDisplay.innerHTML = '<p>Waiting for round end...</p>';
         cardDisplay.style.borderColor = '';
@@ -322,15 +326,23 @@ function renderCardArea() {
         if (deck) deck.classList.remove('deck-disabled');
         useBtn.classList.add('hidden');
         discardBtn.classList.add('hidden');
-        endTurnBtn.classList.add('hidden');
+        doneMovingBtn.classList.add('hidden');
+        if (endTurnWrap) endTurnWrap.classList.add('hidden');
         cardDisplay.className = 'card-display empty';
         cardDisplay.innerHTML = '<p>Click the deck to draw</p>';
         cardDisplay.style.borderColor = '';
     } else if (state.turnPhase === 'action') {
         if (deck) deck.classList.add('deck-disabled');
-        useBtn.classList.remove('hidden');
-        discardBtn.classList.remove('hidden');
-        endTurnBtn.classList.add('hidden');
+        if (endTurnWrap) endTurnWrap.classList.add('hidden');
+        if (isMoving) {
+            useBtn.classList.add('hidden');
+            discardBtn.classList.add('hidden');
+            doneMovingBtn.classList.remove('hidden');
+        } else {
+            useBtn.classList.remove('hidden');
+            discardBtn.classList.remove('hidden');
+            doneMovingBtn.classList.add('hidden');
+        }
         const info = CARD_INFO[state.drawnCard];
         cardDisplay.className = 'card-display';
         cardDisplay.style.borderColor = pColor;
@@ -343,7 +355,8 @@ function renderCardArea() {
         if (deck) deck.classList.add('deck-disabled');
         useBtn.classList.add('hidden');
         discardBtn.classList.add('hidden');
-        endTurnBtn.classList.remove('hidden');
+        doneMovingBtn.classList.add('hidden');
+        if (endTurnWrap) endTurnWrap.classList.remove('hidden');
         cardDisplay.className = 'card-display empty';
         cardDisplay.innerHTML = '<p>Turn complete</p>';
         cardDisplay.style.borderColor = '';
@@ -663,18 +676,15 @@ function handleMoveClick(row, col) {
             peep.row = row;
             peep.col = col;
 
-            // Remove from remaining
+            // Remove from remaining (each peep can only move once)
             state.movesRemaining = state.movesRemaining.filter(i => i !== state.selectedPeepIdx);
             state.peepsMoved.push(state.selectedPeepIdx);
 
-            if (state.movesRemaining.length === 0) {
-                // All moved
-                finishCardAction();
-            } else {
-                state.selectionMode = 'select_peep_move';
-                highlightPlayerPeeps();
-                renderAll();
-            }
+            // Go back to peep selection — player can move another or click Done
+            state.selectionMode = 'select_peep_move';
+            highlightPlayerPeeps();
+            renderAll();
+            renderCardArea(); // keep Done Moving button visible
         }
     }
 }
