@@ -140,16 +140,17 @@ function startGame() {
     const occupied = new Set();
     state.players.forEach(p => p.peeps.forEach(peep => occupied.add(`${peep.row},${peep.col}`)));
 
-    state.bunkers = [];
-    while (state.bunkers.length < state.numBunkers) {
-        const row = Math.floor(Math.random() * 8);
-        const col = Math.floor(Math.random() * 8);
-        const key = `${row},${col}`;
-        if (!occupied.has(key) && !state.bunkers.find(b => b.row === row && b.col === col)) {
-            state.bunkers.push({ row, col, occupant: null });
-            occupied.add(key);
-        }
-    }
+    // Place bunkers randomly in the central 4x4 zone (rows 2-5, cols 2-5)
+    // Cap to available central cells minus at least one gap
+    const centralCells = [];
+    for (let r = 2; r <= 5; r++)
+        for (let c = 2; c <= 5; c++)
+            if (!occupied.has(`${r},${c}`)) centralCells.push({ row: r, col: c });
+
+    // Shuffle and take as many as requested (up to what fits)
+    const shuffled = shuffle(centralCells);
+    const count = Math.min(state.numBunkers, shuffled.length);
+    state.bunkers = shuffled.slice(0, count).map(pos => ({ ...pos, occupant: null }));
 
     state.deck = buildDeck();
     state.round = 1;
@@ -191,6 +192,11 @@ function renderBoard() {
             cell.className = 'cell';
             cell.dataset.row = r;
             cell.dataset.col = c;
+
+            // Shade the central 4x4 zone
+            if (r >= 2 && r <= 5 && c >= 2 && c <= 5) {
+                cell.classList.add('central-zone');
+            }
 
             // Check if bunker
             const bunker = state.bunkers.find(b => b.row === r && b.col === c);

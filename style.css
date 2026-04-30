@@ -182,6 +182,10 @@ body {
     z-index: 1;
 }
 
+.cell.central-zone {
+    background: #e8f5e9;
+}
+
 .cell.bunker {
     background: #8B7355;
     border: 2px solid #5C4033;
