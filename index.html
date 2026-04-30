@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎈 Raining Balloons</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Setup Screen -->
+        <div id="setup-screen" class="screen active">
+            <h1>🎈 Raining Balloons 💧</h1>
+            <p class="subtitle">Don't get soaked!</p>
+            <div class="setup-form">
+                <div class="form-group">
+                    <label>Number of Players</label>
+                    <div class="button-group">
+                        <button class="opt-btn" data-option="players" data-value="2">2</button>
+                        <button class="opt-btn selected" data-option="players" data-value="3">3</button>
+                        <button class="opt-btn" data-option="players" data-value="4">4</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Number of Bunkers</label>
+                    <div class="button-group">
+                        <button class="opt-btn" data-option="bunkers" data-value="2">2</button>
+                        <button class="opt-btn selected" data-option="bunkers" data-value="4">4</button>
+                        <button class="opt-btn" data-option="bunkers" data-value="6">6</button>
+                        <button class="opt-btn" data-option="bunkers" data-value="8">8</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Balloons per Round</label>
+                    <div class="button-group">
+                        <button class="opt-btn" data-option="balloons" data-value="3">3</button>
+                        <button class="opt-btn selected" data-option="balloons" data-value="5">5</button>
+                        <button class="opt-btn" data-option="balloons" data-value="8">8</button>
+                        <button class="opt-btn" data-option="balloons" data-value="12">12</button>
+                    </div>
+                </div>
+                <button id="start-game" class="big-btn">Start Game! 🎮</button>
+            </div>
+        </div>
+
+        <!-- Game Screen -->
+        <div id="game-screen" class="screen">
+            <div class="game-header">
+                <h2 id="game-title">🎈 Raining Balloons</h2>
+                <div id="round-info">Round <span id="round-num">1</span></div>
+            </div>
+            <div class="game-layout">
+                <div class="left-panel">
+                    <div id="player-status"></div>
+                </div>
+                <div class="center-panel">
+                    <div id="board"></div>
+                    <div id="turn-info"></div>
+                </div>
+                <div class="right-panel">
+                    <div id="card-area">
+                        <h3>Current Card</h3>
+                        <div id="drawn-card" class="card-display empty">
+                            <p>Draw a card to begin your turn</p>
+                        </div>
+                        <button id="draw-card-btn" class="action-btn">🃏 Draw Card</button>
+                        <button id="use-card-btn" class="action-btn hidden">✅ Use Card</button>
+                        <button id="discard-btn" class="action-btn hidden">❌ Discard</button>
+                        <button id="end-turn-btn" class="action-btn hidden">➡️ End Turn</button>
+                    </div>
+                    <div id="round-controls" class="hidden">
+                        <button id="drop-balloons-btn" class="big-btn danger">💧 Drop Balloons!</button>
+                    </div>
+                    <div id="redo-controls" class="hidden">
+                        <button id="redo-btn" class="action-btn">🔄 Redo! Cancel & Re-drop</button>
+                        <button id="accept-drop-btn" class="action-btn">👍 Accept Drop</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="gameover-screen" class="screen">
+            <h1>🎉 Game Over!</h1>
+            <p id="winner-text"></p>
+            <button id="play-again-btn" class="big-btn">Play Again 🔄</button>
+        </div>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+
+    <script src="game.js"></script>
+</body>
+</html>
