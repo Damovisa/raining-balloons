@@ -525,7 +525,7 @@ function getCannotUseReason(card) {
     }
 }
 
-function useCard() {
+function canUseCard(card) {
     const player = state.players[state.currentPlayerIndex];
     switch (card) {
         case CARD_TYPES.MOVE:
@@ -554,6 +554,7 @@ function useCard() {
 
 function useCard() {
     if (state.turnPhase !== 'action' || !state.drawnCard) return;
+    if (!canUseCard(state.drawnCard)) return;
 
     const card = state.drawnCard;
 
