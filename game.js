@@ -317,7 +317,8 @@ function getSelectionPrompt() {
         case 'select_peep_umbrella': return 'Click one of your peeps to give the umbrella';
         case 'select_peep_steal_from': return 'Click an opponent\'s peep with an umbrella to steal';
         case 'select_peep_steal_to': return 'Click one of your peeps to receive the umbrella';
-        case 'select_peep_bunker': return 'Click one of your peeps adjacent to a bunker';
+        case 'select_peep_bunker':      return 'Click one of your peeps adjacent to a bunker';
+        case 'select_bunker_target':    return 'Click a bunker to enter it';
         case 'select_peep_move': return 'Click a peep to move (or click a highlighted square)';
         case 'select_move_target': return 'Click a highlighted square to move there';
         default: return '';
@@ -818,18 +819,15 @@ function startStealAction() {
 // --- BUNKER KEY ---
 function startBunkerAction() {
     const player = state.players[state.currentPlayerIndex];
-    // Find peeps adjacent to a bunker
     const eligible = [];
 
     player.peeps.forEach((peep, idx) => {
         if (!peep.alive || peep.inBunker) return;
         const adjacent = getAdjacentCells(peep.row, peep.col);
-        const nearBunker = state.bunkers.find(b =>
+        const hasNearBunker = state.bunkers.some(b =>
             adjacent.some(a => a.row === b.row && a.col === b.col)
         );
-        if (nearBunker) {
-            eligible.push({ row: peep.row, col: peep.col, peepIdx: idx });
-        }
+        if (hasNearBunker) eligible.push({ row: peep.row, col: peep.col, peepIdx: idx });
     });
 
     if (eligible.length === 0) {
@@ -903,37 +901,56 @@ function onCellClick(row, col) {
 
     if (state.selectionMode === 'select_peep_bunker') {
         const target = state.moveTargets.find(t => t.row === row && t.col === col);
-        if (target) {
-            const peep = player.peeps[target.peepIdx];
-            // Find adjacent bunker
-            const adjacent = getAdjacentCells(peep.row, peep.col);
-            const bunker = state.bunkers.find(b =>
-                adjacent.some(a => a.row === b.row && a.col === b.col)
-            );
+        if (!target) return;
 
-            if (bunker) {
-                // If occupied, push out the occupant
-                if (bunker.occupant) {
-                    const occPlayer = state.players[bunker.occupant.playerIndex];
-                    const occPeep = occPlayer.peeps[bunker.occupant.peepIndex];
-                    occPeep.inBunker = false;
-                    occPeep.row = peep.row;
-                    occPeep.col = peep.col;
-                    toast(`${PLAYER_NAMES[bunker.occupant.playerIndex]}'s peep was pushed out!`);
-                }
+        const peep = player.peeps[target.peepIdx];
+        const adjacent = getAdjacentCells(peep.row, peep.col);
+        const reachableBunkers = state.bunkers.filter(b =>
+            adjacent.some(a => a.row === b.row && a.col === b.col)
+        );
 
-                // Move peep into bunker
-                peep.inBunker = true;
-                peep.row = bunker.row;
-                peep.col = bunker.col;
-                bunker.occupant = { playerIndex: state.currentPlayerIndex, peepIndex: target.peepIdx, turnsLeft: 3 };
-                toast(`${PLAYER_NAMES[state.currentPlayerIndex]}'s peep entered a bunker for 3 rounds! 🏠`);
-                finishCardAction();
-            }
+        if (reachableBunkers.length === 1) {
+            // Only one option — enter it directly
+            enterBunker(target.peepIdx, reachableBunkers[0]);
+        } else {
+            // Multiple bunkers — ask which one
+            state.selectedPeepIdx = target.peepIdx;
+            state.selectionMode = 'select_bunker_target';
+            state.moveTargets = reachableBunkers.map(b => ({ row: b.row, col: b.col }));
+            renderAll();
+        }
+        return;
+    }
+
+    if (state.selectionMode === 'select_bunker_target') {
+        const bunker = state.bunkers.find(b => b.row === row && b.col === col);
+        if (bunker && state.moveTargets.find(t => t.row === row && t.col === col)) {
+            enterBunker(state.selectedPeepIdx, bunker);
         }
         return;
     }
 }
+
+function enterBunker(peepIdx, bunker) {
+    const player = state.players[state.currentPlayerIndex];
+    const peep = player.peeps[peepIdx];
+
+    // Push out existing occupant
+    if (bunker.occupant) {
+        const occPlayer = state.players[bunker.occupant.playerIndex];
+        const occPeep = occPlayer.peeps[bunker.occupant.peepIndex];
+        occPeep.inBunker = false;
+        occPeep.row = peep.row;
+        occPeep.col = peep.col;
+        toast(`${PLAYER_NAMES[bunker.occupant.playerIndex]}'s peep was pushed out!`);
+    }
+
+    peep.inBunker = true;
+    peep.row = bunker.row;
+    peep.col = bunker.col;
+    bunker.occupant = { playerIndex: state.currentPlayerIndex, peepIndex: peepIdx, turnsLeft: 3 };
+    toast(`${PLAYER_NAMES[state.currentPlayerIndex]}'s peep entered a bunker for 3 rounds! 🏠`);
+    finishCardAction();
 
 function finishCardAction() {
     state.drawnCard = null;
