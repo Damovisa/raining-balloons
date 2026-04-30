@@ -153,17 +153,19 @@ body {
 #board {
     display: grid;
     grid-template-columns: repeat(8, 1fr);
-    gap: 2px;
-    background: rgba(255,255,255,0.9);
+    gap: 0;
+    background: #aaa;
+    border: 2px solid #aaa;
     border-radius: 12px;
-    padding: 8px;
+    padding: 0;
     box-shadow: 0 5px 30px rgba(0,0,0,0.2);
     aspect-ratio: 1;
+    overflow: hidden;
 }
 
 .cell {
     aspect-ratio: 1;
-    border-radius: 6px;
+    border-radius: 3px;
     background: #f0f0f0;
     display: flex;
     align-items: center;
@@ -172,7 +174,7 @@ body {
     position: relative;
     cursor: pointer;
     transition: all 0.3s;
-    border: 2px solid transparent;
+    border: 2px solid #ccc;
 }
 
 .cell:hover {
