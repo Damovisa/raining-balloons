@@ -353,6 +353,19 @@ body {
     color: #333;
 }
 
+#use-card-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.card-blocked {
+    margin-top: 6px;
+    font-size: 0.75rem;
+    color: #c0392b;
+    font-weight: 600;
+}
+
 #done-moving-btn {
     background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
     color: #333;

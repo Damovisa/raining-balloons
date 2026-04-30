@@ -342,6 +342,9 @@ function renderCardArea() {
             useBtn.classList.remove('hidden');
             discardBtn.classList.remove('hidden');
             doneMovingBtn.classList.add('hidden');
+            const usable = canUseCard(state.drawnCard);
+            useBtn.disabled = !usable;
+            useBtn.title = usable ? '' : getCannotUseReason(state.drawnCard);
         }
         const info = CARD_INFO[state.drawnCard];
         cardDisplay.className = 'card-display';
@@ -350,6 +353,7 @@ function renderCardArea() {
             <div class="card-icon">${info.icon}</div>
             <div class="card-name">${info.name}</div>
             <div class="card-desc">${info.desc}</div>
+            ${!canUseCard(state.drawnCard) ? `<div class="card-blocked">⚠️ ${getCannotUseReason(state.drawnCard)}</div>` : ''}
         `;
     } else if (state.turnPhase === 'done') {
         if (deck) deck.classList.add('deck-disabled');
@@ -508,6 +512,43 @@ function animateCardDeal(card, onComplete) {
             }, 450);
         }, 120);
     }, 500);
+}
+
+function getCannotUseReason(card) {
+    switch (card) {
+        case CARD_TYPES.MOVE:           return 'No peeps to move';
+        case CARD_TYPES.UMBRELLA:       return 'No peeps to equip';
+        case CARD_TYPES.STEAL_UMBRELLA: return 'No umbrellas to steal';
+        case CARD_TYPES.BUNKER_KEY:     return 'No peep is next to a bunker';
+        default: return '';
+    }
+}
+
+function useCard() {
+    const player = state.players[state.currentPlayerIndex];
+    switch (card) {
+        case CARD_TYPES.MOVE:
+            return player.peeps.some(p => p.alive && !p.inBunker);
+
+        case CARD_TYPES.UMBRELLA:
+            return player.peeps.some(p => p.alive);
+
+        case CARD_TYPES.STEAL_UMBRELLA:
+            return state.players.some((p, pi) =>
+                pi !== state.currentPlayerIndex && p.peeps.some(peep => peep.alive && peep.hasUmbrella)
+            );
+
+        case CARD_TYPES.BUNKER_KEY:
+            return player.peeps.some(peep => {
+                if (!peep.alive || peep.inBunker) return false;
+                return getAdjacentCells(peep.row, peep.col).some(adj =>
+                    state.bunkers.some(b => b.row === adj.row && b.col === adj.col)
+                );
+            });
+
+        default:
+            return true;
+    }
 }
 
 function useCard() {
