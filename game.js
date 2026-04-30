@@ -951,6 +951,7 @@ function enterBunker(peepIdx, bunker) {
     bunker.occupant = { playerIndex: state.currentPlayerIndex, peepIndex: peepIdx, turnsLeft: 3 };
     toast(`${PLAYER_NAMES[state.currentPlayerIndex]}'s peep entered a bunker for 3 rounds! 🏠`);
     finishCardAction();
+}
 
 function finishCardAction() {
     state.drawnCard = null;
