@@ -588,6 +588,11 @@ function drawCard() {
             } else {
                 startEndTurnTimer();
             }
+        } else if (card === CARD_TYPES.MOVE) {
+            // Auto-start moving — skip Use/Discard prompt
+            state.drawnCard = card;
+            state.turnPhase = 'action';
+            startMoveAction();
         } else {
             state.drawnCard = card;
             state.turnPhase = 'action';
@@ -868,9 +873,10 @@ function handleMoveClick(row, col) {
         if (peepIdx !== undefined) {
             state.selectedPeepIdx = peepIdx;
             state.selectionMode = 'select_move_target';
-            // Show valid move targets (adjacent squares, excluding bunkers)
+            // Show valid move targets (adjacent squares, excluding bunkers and occupied squares)
             const peep = player.peeps[peepIdx];
-            state.moveTargets = getAdjacentCells(peep.row, peep.col, true);
+            state.moveTargets = getAdjacentCells(peep.row, peep.col, true)
+                .filter(c => !isOccupied(c.row, c.col, state.currentPlayerIndex, peepIdx));
             renderAll();
         }
     } else if (state.selectionMode === 'select_move_target') {
@@ -905,6 +911,25 @@ function getAdjacentCells(row, col, excludeBunkers = false) {
         }
     });
     return cells;
+}
+
+// Returns true if any alive, non-bunker peep occupies (row, col), ignoring one specific peep.
+function isOccupied(row, col, exceptPlayerIndex = -1, exceptPeepIndex = -1) {
+    return state.players.some((p, pi) =>
+        p.peeps.some((peep, idx) => {
+            if (pi === exceptPlayerIndex && idx === exceptPeepIndex) return false;
+            return peep.alive && !peep.inBunker && peep.row === row && peep.col === col;
+        })
+    );
+}
+
+// Returns a random free adjacent non-bunker cell near a bunker for ejecting peeps.
+function findFreeAdjacentCell(bunkerRow, bunkerCol) {
+    const adjacent = getAdjacentCells(bunkerRow, bunkerCol, true); // exclude bunker squares
+    const free = adjacent.filter(c => !isOccupied(c.row, c.col));
+    const pool = free.length > 0 ? free : adjacent; // fallback: ignore occupancy
+    if (pool.length === 0) return { row: bunkerRow, col: bunkerCol };
+    return pool[Math.floor(Math.random() * pool.length)];
 }
 
 // --- UMBRELLA ---
@@ -1072,8 +1097,9 @@ function enterBunker(peepIdx, bunker) {
         const occPlayer = state.players[bunker.occupant.playerIndex];
         const occPeep = occPlayer.peeps[bunker.occupant.peepIndex];
         occPeep.inBunker = false;
-        occPeep.row = peep.row;
-        occPeep.col = peep.col;
+        const ejectCell = findFreeAdjacentCell(bunker.row, bunker.col);
+        occPeep.row = ejectCell.row;
+        occPeep.col = ejectCell.col;
         toast(`${PLAYER_NAMES[bunker.occupant.playerIndex]}'s peep was pushed out!`);
     }
 
@@ -1206,6 +1232,9 @@ function enforceBunkerCap() {
             const player = state.players[bunker.occupant.playerIndex];
             const peep = player.peeps[bunker.occupant.peepIndex];
             peep.inBunker = false;
+            const ejectCell = findFreeAdjacentCell(bunker.row, bunker.col);
+            peep.row = ejectCell.row;
+            peep.col = ejectCell.col;
             toast(`A bunker was destroyed — ${PLAYER_NAMES[bunker.occupant.playerIndex]}'s peep was ejected! 💥`);
         } else {
             toast('A bunker was destroyed! 💥');
@@ -1319,6 +1348,9 @@ function advanceRound() {
             const player = state.players[bunker.occupant.playerIndex];
             const peep = player.peeps[bunker.occupant.peepIndex];
             peep.inBunker = false;
+            const ejectCell = findFreeAdjacentCell(bunker.row, bunker.col);
+            peep.row = ejectCell.row;
+            peep.col = ejectCell.col;
             toast(`${PLAYER_NAMES[bunker.occupant.playerIndex]}'s peep was ejected from the bunker! ⏰`);
             bunker.occupant = null;
         }
