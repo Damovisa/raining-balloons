@@ -79,6 +79,7 @@ let state = {
     currentPlayerIndex: 0,
     turnPhase: 'draw', // 'draw', 'action', 'done'
     players: [],
+    playerTypes: [],   // 'human' or 'computer' per player index
     bunkers: [],       // [{row, col, occupant: null | {playerIndex, peepIndex}}]
     deck: [],
     drawnCard: null,
@@ -100,6 +101,7 @@ let state = {
 // ==============================
 document.addEventListener('DOMContentLoaded', () => {
     setupOptionButtons();
+    updatePlayerTypeOptions();
     document.getElementById('start-game').addEventListener('click', startGame);
     document.getElementById('card-deck').addEventListener('click', drawCard);
     document.getElementById('use-card-btn').addEventListener('click', useCard);
@@ -119,10 +121,82 @@ function setupOptionButtons() {
             const group = btn.dataset.option;
             document.querySelectorAll(`[data-option="${group}"]`).forEach(b => b.classList.remove('selected'));
             btn.classList.add('selected');
-            if (group === 'players') updateBunkerOptions();
+            if (group === 'players') {
+                updateBunkerOptions();
+                updatePlayerTypeOptions();
+            }
         });
     });
     updateBunkerOptions();
+}
+
+function updatePlayerTypeOptions() {
+    const numPlayers = parseInt(document.querySelector('[data-option="players"].selected').dataset.value);
+    const container = document.getElementById('player-types-container');
+    if (!container) return;
+
+    // Preserve existing selections before rebuilding
+    const existing = {};
+    container.querySelectorAll('[data-player-type].selected').forEach(btn => {
+        existing[btn.dataset.playerIndex] = btn.dataset.playerType;
+    });
+
+    container.innerHTML = '';
+    for (let i = 0; i < numPlayers; i++) {
+        const row = document.createElement('div');
+        row.className = 'player-type-row';
+
+        const label = document.createElement('span');
+        label.className = `player-type-label player-${i + 1}`;
+        label.textContent = `${PLAYER_EMOJIS[i]} ${PLAYER_NAMES[i]}`;
+        row.appendChild(label);
+
+        if (i === 0) {
+            const badge = document.createElement('span');
+            badge.className = 'opt-btn selected';
+            badge.textContent = '👤 Human';
+            badge.style.cursor = 'default';
+            row.appendChild(badge);
+        } else {
+            const group = document.createElement('div');
+            group.className = 'player-type-toggle';
+
+            const humanBtn = document.createElement('button');
+            humanBtn.className = 'opt-btn';
+            humanBtn.textContent = '👤 Human';
+            humanBtn.dataset.playerType = 'human';
+            humanBtn.dataset.playerIndex = i;
+
+            const aiBtn = document.createElement('button');
+            aiBtn.className = 'opt-btn';
+            aiBtn.textContent = '🤖 Computer';
+            aiBtn.dataset.playerType = 'computer';
+            aiBtn.dataset.playerIndex = i;
+
+            // Restore previous selection or default to human
+            const prev = existing[i];
+            if (prev === 'computer') {
+                aiBtn.classList.add('selected');
+            } else {
+                humanBtn.classList.add('selected');
+            }
+
+            humanBtn.addEventListener('click', () => {
+                humanBtn.classList.add('selected');
+                aiBtn.classList.remove('selected');
+            });
+            aiBtn.addEventListener('click', () => {
+                aiBtn.classList.add('selected');
+                humanBtn.classList.remove('selected');
+            });
+
+            group.appendChild(humanBtn);
+            group.appendChild(aiBtn);
+            row.appendChild(group);
+        }
+
+        container.appendChild(row);
+    }
 }
 
 function updateBunkerOptions() {
@@ -150,6 +224,17 @@ function startGame() {
     state.numPlayers = parseInt(document.querySelector('[data-option="players"].selected').dataset.value);
     state.numBunkers = parseInt(document.querySelector('[data-option="bunkers"].selected').dataset.value);
     state.numBalloons = parseInt(document.querySelector('[data-option="balloons"].selected').dataset.value);
+
+    // Read player types (player 0 is always human)
+    state.playerTypes = [];
+    for (let i = 0; i < state.numPlayers; i++) {
+        if (i === 0) {
+            state.playerTypes.push('human');
+        } else {
+            const sel = document.querySelector(`[data-player-index="${i}"][data-player-type].selected`);
+            state.playerTypes.push(sel ? sel.dataset.playerType : 'human');
+        }
+    }
 
     // Initialize players
     state.players = [];
@@ -193,6 +278,7 @@ function startGame() {
     enforceBunkerCap();
     renderAll();
     updateDeckCount();
+    maybeScheduleAI();
 }
 
 // ==============================
@@ -285,7 +371,7 @@ function renderPlayerStatus() {
         const inBunkers = alivePeeps.filter(p => p.inBunker).length;
 
         card.innerHTML = `
-            <h4 class="player-${i + 1}">${PLAYER_EMOJIS[i]} ${PLAYER_NAMES[i]}</h4>
+            <h4 class="player-${i + 1}">${PLAYER_EMOJIS[i]} ${PLAYER_NAMES[i]}${isAI(i) ? ' <span class="ai-badge">🤖</span>' : ''}</h4>
             <div class="peep-list">
                 Peeps: ${alivePeeps.length}/3
                 ${umbrellas ? ` | ☂️×${umbrellas}` : ''}
@@ -304,9 +390,10 @@ function renderTurnInfo() {
     } else if (state.gameOver) {
         el.textContent = '';
     } else {
-        const p = state.players[state.currentPlayerIndex];
-        el.textContent = `${PLAYER_EMOJIS[state.currentPlayerIndex]} ${PLAYER_NAMES[state.currentPlayerIndex]}'s Turn`;
-        if (state.selectionMode) {
+        const aiTurn = isCurrentPlayerAI();
+        const prefix = aiTurn ? '🤖 ' : '';
+        el.textContent = `${prefix}${PLAYER_EMOJIS[state.currentPlayerIndex]} ${PLAYER_NAMES[state.currentPlayerIndex]}'s Turn`;
+        if (state.selectionMode && !aiTurn) {
             el.textContent += ` — ${getSelectionPrompt()}`;
         }
     }
@@ -355,16 +442,42 @@ function renderCardArea() {
     if (title) title.textContent = `${PLAYER_EMOJIS[state.currentPlayerIndex]} ${pName}'s Turn`;
 
     if (state.turnPhase === 'draw') {
-        if (deck) deck.classList.remove('deck-disabled');
-        useBtn.classList.add('hidden');
-        discardBtn.classList.add('hidden');
-        doneMovingBtn.classList.add('hidden');
-        if (endTurnWrap) endTurnWrap.classList.add('hidden');
-        cardDisplay.className = 'card-display empty';
-        cardDisplay.innerHTML = '<p>Click the deck to draw</p>';
-        cardDisplay.style.borderColor = '';
+        if (isCurrentPlayerAI()) {
+            if (deck) deck.classList.add('deck-disabled');
+            useBtn.classList.add('hidden');
+            discardBtn.classList.add('hidden');
+            doneMovingBtn.classList.add('hidden');
+            if (endTurnWrap) endTurnWrap.classList.add('hidden');
+            cardDisplay.className = 'card-display empty';
+            cardDisplay.innerHTML = '<p>🤖 Computer is thinking…</p>';
+            cardDisplay.style.borderColor = '';
+        } else {
+            if (deck) deck.classList.remove('deck-disabled');
+            useBtn.classList.add('hidden');
+            discardBtn.classList.add('hidden');
+            doneMovingBtn.classList.add('hidden');
+            if (endTurnWrap) endTurnWrap.classList.add('hidden');
+            cardDisplay.className = 'card-display empty';
+            cardDisplay.innerHTML = '<p>Click the deck to draw</p>';
+            cardDisplay.style.borderColor = '';
+        }
     } else if (state.turnPhase === 'action') {
         if (deck) deck.classList.add('deck-disabled');
+        if (isCurrentPlayerAI()) {
+            useBtn.classList.add('hidden');
+            discardBtn.classList.add('hidden');
+            doneMovingBtn.classList.add('hidden');
+            if (endTurnWrap) endTurnWrap.classList.add('hidden');
+            const info = state.drawnCard ? CARD_INFO[state.drawnCard] : null;
+            cardDisplay.className = 'card-display';
+            cardDisplay.style.borderColor = pColor;
+            cardDisplay.innerHTML = info
+                ? `<div class="card-icon">${info.icon}</div>
+                   <div class="card-name">${info.name}</div>
+                   <div class="card-desc">🤖 Computer is playing…</div>`
+                : '<p>🤖 Computer is thinking…</p>';
+            return;
+        }
         if (endTurnWrap) endTurnWrap.classList.add('hidden');
         if (isMoving) {
             useBtn.classList.add('hidden');
@@ -392,7 +505,13 @@ function renderCardArea() {
         useBtn.classList.add('hidden');
         discardBtn.classList.add('hidden');
         doneMovingBtn.classList.add('hidden');
-        if (endTurnWrap) endTurnWrap.classList.remove('hidden');
+        if (endTurnWrap) {
+            if (isCurrentPlayerAI()) {
+                endTurnWrap.classList.add('hidden');
+            } else {
+                endTurnWrap.classList.remove('hidden');
+            }
+        }
         cardDisplay.className = 'card-display empty';
         cardDisplay.innerHTML = '<p>Turn complete</p>';
         cardDisplay.style.borderColor = '';
@@ -463,11 +582,18 @@ function drawCard() {
             toast(`${PLAYER_NAMES[state.currentPlayerIndex]} drew Redo and is holding it! 🔄`);
             state.drawnCard = null;
             state.turnPhase = 'done';
+            renderAll();
+            if (isCurrentPlayerAI()) {
+                maybeScheduleAI();
+            } else {
+                startEndTurnTimer();
+            }
         } else {
             state.drawnCard = card;
             state.turnPhase = 'action';
+            renderAll();
+            maybeScheduleAI();
         }
-        renderAll();
     });
 }
 
@@ -611,7 +737,11 @@ function discardCard() {
     state.turnPhase = 'done';
     clearSelection();
     renderAll();
-    startEndTurnTimer();
+    if (isCurrentPlayerAI()) {
+        maybeScheduleAI();
+    } else {
+        startEndTurnTimer();
+    }
 }
 
 let endTurnTimer = null;
@@ -684,6 +814,7 @@ function endTurn() {
     state.drawnCard = null;
     clearSelection();
     renderAll();
+    maybeScheduleAI();
 }
 
 // ==============================
@@ -847,6 +978,7 @@ function startBunkerAction() {
 // ==============================
 function onCellClick(row, col) {
     if (!state.selectionMode) return;
+    if (isCurrentPlayerAI()) return; // AI handles its own selections
 
     const player = state.players[state.currentPlayerIndex];
 
@@ -958,7 +1090,11 @@ function finishCardAction() {
     state.turnPhase = 'done';
     clearSelection();
     renderAll();
-    startEndTurnTimer();
+    if (isCurrentPlayerAI()) {
+        maybeScheduleAI();
+    } else {
+        startEndTurnTimer();
+    }
 }
 
 function clearSelection() {
@@ -1008,10 +1144,12 @@ function dropBalloons() {
         animateHits(hits, () => {
             applyBalloonDamage(hits);
             renderAll();
+            maybeScheduleAI();
         });
     } else {
         applyBalloonDamage(hits);
         renderAll();
+        maybeScheduleAI();
     }
 }
 
@@ -1168,6 +1306,7 @@ function passRedo() {
         advanceRound();
     } else {
         renderAll();
+        maybeScheduleAI();
     }
 }
 
@@ -1198,6 +1337,7 @@ function advanceRound() {
     document.getElementById('round-num').textContent = state.round;
     clearSelection();
     renderAll();
+    maybeScheduleAI();
 }
 
 // ==============================
@@ -1219,4 +1359,266 @@ function toast(msg) {
     el.classList.remove('hidden');
     clearTimeout(el._timeout);
     el._timeout = setTimeout(() => el.classList.add('hidden'), 2500);
+}
+
+// ==============================
+// Computer Player AI
+// ==============================
+
+function isAI(playerIndex) {
+    return !!(state.playerTypes && state.playerTypes[playerIndex] === 'computer');
+}
+
+function isCurrentPlayerAI() {
+    return isAI(state.currentPlayerIndex);
+}
+
+let aiActionTimeout = null;
+
+// Called at each state transition to schedule AI actions as needed.
+// Uses a timeout so rapid re-renders don't double-fire.
+function maybeScheduleAI() {
+    if (state.gameOver) return;
+
+    // Clear any previously queued AI step (prevents double-scheduling)
+    if (aiActionTimeout) {
+        clearTimeout(aiActionTimeout);
+        aiActionTimeout = null;
+    }
+
+    if (isRoundEndPhase()) {
+        // Check if the current redo-queue decider is a computer
+        const decider = currentRedoDecider();
+        if (decider !== null && isAI(decider)) {
+            aiActionTimeout = setTimeout(() => {
+                aiActionTimeout = null;
+                aiDecideRedo(decider);
+            }, 1200);
+        }
+        return;
+    }
+
+    if (!isCurrentPlayerAI()) return;
+
+    switch (state.turnPhase) {
+        case 'draw':
+            aiActionTimeout = setTimeout(() => {
+                aiActionTimeout = null;
+                if (isCurrentPlayerAI() && state.turnPhase === 'draw') drawCard();
+            }, 900);
+            break;
+
+        case 'action':
+            aiActionTimeout = setTimeout(() => {
+                aiActionTimeout = null;
+                aiDecideCard();
+            }, 700);
+            break;
+
+        case 'done':
+            aiActionTimeout = setTimeout(() => {
+                aiActionTimeout = null;
+                if (isCurrentPlayerAI() && state.turnPhase === 'done') {
+                    cancelEndTurnTimer();
+                    endTurn();
+                }
+            }, 800);
+            break;
+    }
+}
+
+function aiDecideCard() {
+    if (!isCurrentPlayerAI() || state.turnPhase !== 'action') return;
+    const card = state.drawnCard;
+
+    if (!canUseCard(card)) {
+        discardCard();
+        return;
+    }
+
+    switch (card) {
+        case CARD_TYPES.MOVE:           aiDoMove();         break;
+        case CARD_TYPES.UMBRELLA:       aiDoUmbrella();     break;
+        case CARD_TYPES.STEAL_UMBRELLA: aiDoSteal();        break;
+        case CARD_TYPES.BUNKER_KEY:     aiDoBunkerKey();    break;
+        default: discardCard();
+    }
+}
+
+// Move: move each peep toward the nearest available bunker (or toward center)
+function aiDoMove() {
+    startMoveAction();
+    const allIndices = [...state.movesRemaining];
+    aiMovePeepSequence(allIndices, 0, () => {
+        setTimeout(() => finishCardAction(), 500);
+    });
+}
+
+function aiMovePeepSequence(allIndices, pos, onDone) {
+    if (pos >= allIndices.length) { onDone(); return; }
+
+    const player = state.players[state.currentPlayerIndex];
+    const peepIdx = allIndices[pos];
+    const peep = player.peeps[peepIdx];
+
+    setTimeout(() => {
+        if (!isCurrentPlayerAI()) return;
+
+        const target = aiBestMoveTarget(peep);
+        if (target) {
+            peep.row = target.row;
+            peep.col = target.col;
+        }
+
+        state.movesRemaining = state.movesRemaining.filter(i => i !== peepIdx);
+        state.peepsMoved.push(peepIdx);
+        state.selectionMode = 'select_peep_move';
+        highlightPlayerPeeps();
+        renderAll();
+
+        aiMovePeepSequence(allIndices, pos + 1, onDone);
+    }, 700);
+}
+
+function aiBestMoveTarget(peep) {
+    const adjacent = getAdjacentCells(peep.row, peep.col, true); // exclude bunkers
+    if (adjacent.length === 0) return null;
+
+    const availBunkers = state.bunkers.filter(b => !b.occupant);
+
+    let best = null;
+    let bestScore = Infinity;
+
+    adjacent.forEach(cell => {
+        let score;
+        if (availBunkers.length > 0) {
+            // Move toward the nearest available bunker
+            score = Math.min(...availBunkers.map(b =>
+                Math.abs(b.row - cell.row) + Math.abs(b.col - cell.col)
+            ));
+        } else {
+            // No bunkers — move toward center of board
+            score = Math.abs(cell.row - 3.5) + Math.abs(cell.col - 3.5);
+        }
+        if (score < bestScore) {
+            bestScore = score;
+            best = cell;
+        }
+    });
+
+    return best;
+}
+
+// Umbrella: give to an unprotected peep, preferring more central ones
+function aiDoUmbrella() {
+    startUmbrellaAction();
+
+    setTimeout(() => {
+        if (!isCurrentPlayerAI()) return;
+        const player = state.players[state.currentPlayerIndex];
+
+        const candidates = player.peeps.filter(p => p.alive && !p.hasUmbrella);
+        const pool = candidates.length > 0 ? candidates : player.peeps.filter(p => p.alive);
+        const target = pool.reduce((a, b) => aiCentrality(a) > aiCentrality(b) ? a : b, pool[0]);
+
+        if (target) {
+            target.hasUmbrella = true;
+            toast(`${PLAYER_NAMES[state.currentPlayerIndex]}'s peep got an umbrella! ☂️`);
+            finishCardAction();
+        }
+    }, 700);
+}
+
+// Steal: take an umbrella from an opponent, give to own most-central unprotected peep
+function aiDoSteal() {
+    startStealAction();
+
+    setTimeout(() => {
+        if (!isCurrentPlayerAI()) return;
+        const player = state.players[state.currentPlayerIndex];
+
+        // Pick first opponent umbrella
+        let sourcePeep = null;
+        outer:
+        for (let pi = 0; pi < state.players.length; pi++) {
+            if (pi === state.currentPlayerIndex) continue;
+            for (const peep of state.players[pi].peeps) {
+                if (peep.alive && peep.hasUmbrella) { sourcePeep = peep; break outer; }
+            }
+        }
+        if (!sourcePeep) { discardCard(); return; }
+
+        sourcePeep.hasUmbrella = false;
+
+        // Briefly show own peeps as highlighted targets
+        state.selectionMode = 'select_peep_steal_to';
+        state.moveTargets = player.peeps.filter(p => p.alive).map(p => ({ row: p.row, col: p.col }));
+        renderAll();
+
+        setTimeout(() => {
+            if (!isCurrentPlayerAI()) return;
+            const noBrella = player.peeps.filter(p => p.alive && !p.hasUmbrella);
+            const pool = noBrella.length > 0 ? noBrella : player.peeps.filter(p => p.alive);
+            const target = pool.reduce((a, b) => aiCentrality(a) > aiCentrality(b) ? a : b, pool[0]);
+            if (target) {
+                target.hasUmbrella = true;
+                toast(`${PLAYER_NAMES[state.currentPlayerIndex]} stole an umbrella! 🫳`);
+            }
+            finishCardAction();
+        }, 600);
+    }, 700);
+}
+
+// Bunker key: enter the first reachable bunker
+function aiDoBunkerKey() {
+    startBunkerAction();
+
+    setTimeout(() => {
+        if (!isCurrentPlayerAI()) return;
+        const player = state.players[state.currentPlayerIndex];
+
+        for (let pi = 0; pi < player.peeps.length; pi++) {
+            const peep = player.peeps[pi];
+            if (!peep.alive || peep.inBunker) continue;
+
+            const adjacent = getAdjacentCells(peep.row, peep.col);
+            const nearBunker = state.bunkers.find(b =>
+                adjacent.some(a => a.row === b.row && a.col === b.col)
+            );
+            if (nearBunker) {
+                enterBunker(pi, nearBunker); // enterBunker calls finishCardAction
+                return;
+            }
+        }
+        discardCard();
+    }, 700);
+}
+
+// Redo decision: use if the drop hurt us, otherwise pass
+function aiDecideRedo(deciderIndex) {
+    if (currentRedoDecider() !== deciderIndex) return;
+    if (!isAI(deciderIndex)) return;
+
+    let wasHurt = false;
+    if (state.preDrop) {
+        const prePlayer = state.preDrop.players[deciderIndex];
+        const curPlayer = state.players[deciderIndex];
+        wasHurt = prePlayer.peeps.some((prePeep, i) => {
+            const curPeep = curPlayer.peeps[i];
+            return (prePeep.alive && !curPeep.alive) ||
+                   (prePeep.hasUmbrella && !curPeep.hasUmbrella);
+        });
+    }
+
+    if (wasHurt) {
+        toast(`🤖 ${PLAYER_NAMES[deciderIndex]} uses Redo! 🔄`);
+        setTimeout(() => useRedo(), 600);
+    } else {
+        setTimeout(() => passRedo(), 600);
+    }
+}
+
+// Higher = more central on the board
+function aiCentrality(peep) {
+    return -(Math.abs(peep.row - 3.5) + Math.abs(peep.col - 3.5));
 }
