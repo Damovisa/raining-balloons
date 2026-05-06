@@ -1497,7 +1497,7 @@ function aiMovePeepSequence(allIndices, pos, onDone) {
     setTimeout(() => {
         if (!isCurrentPlayerAI()) return;
 
-        const target = aiBestMoveTarget(peep);
+        const target = aiBestMoveTarget(peep, peepIdx);
         if (target) {
             peep.row = target.row;
             peep.col = target.col;
@@ -1513,8 +1513,10 @@ function aiMovePeepSequence(allIndices, pos, onDone) {
     }, 700);
 }
 
-function aiBestMoveTarget(peep) {
-    const adjacent = getAdjacentCells(peep.row, peep.col, true); // exclude bunkers
+function aiBestMoveTarget(peep, peepIdx) {
+    const playerIdx = state.currentPlayerIndex;
+    const adjacent = getAdjacentCells(peep.row, peep.col, true) // exclude bunkers
+        .filter(c => !isOccupied(c.row, c.col, playerIdx, peepIdx)); // exclude occupied squares
     if (adjacent.length === 0) return null;
 
     const availBunkers = state.bunkers.filter(b => !b.occupant);
