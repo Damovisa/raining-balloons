@@ -233,6 +233,11 @@ body {
     position: relative;
 }
 
+.peep.peep-moved {
+    opacity: 0.35;
+    filter: grayscale(60%);
+}
+
 .peep.has-umbrella::after {
     content: '☂️';
     position: absolute;

@@ -338,6 +338,11 @@ function renderBoard() {
                         const peepEl = document.createElement('span');
                         peepEl.className = `peep player-${pi + 1}`;
                         if (peep.hasUmbrella) peepEl.classList.add('has-umbrella');
+                        // Dim peeps that have already moved this turn
+                        if (pi === state.currentPlayerIndex &&
+                            state.peepsMoved && state.peepsMoved.includes(peepIdx)) {
+                            peepEl.classList.add('peep-moved');
+                        }
                         peepEl.textContent = PLAYER_EMOJIS[pi];
                         cell.appendChild(peepEl);
                     }
