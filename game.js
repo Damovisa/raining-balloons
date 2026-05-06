@@ -1133,6 +1133,7 @@ function clearSelection() {
     state.selectionMode = null;
     state.moveTargets = [];
     state.selectedPeepIdx = null;
+    state.peepsMoved = [];
 }
 
 // ==============================
