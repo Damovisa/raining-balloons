@@ -593,6 +593,7 @@ function drawCard() {
             state.drawnCard = card;
             state.turnPhase = 'action';
             startMoveAction();
+            maybeScheduleAI();
         } else {
             state.drawnCard = card;
             state.turnPhase = 'action';
