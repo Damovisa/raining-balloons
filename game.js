@@ -839,6 +839,7 @@ function startMoveAction() {
 
     if (alivePeeps.length === 0) {
         toast("No peeps to move!");
+        finishCardAction();
         return;
     }
 
