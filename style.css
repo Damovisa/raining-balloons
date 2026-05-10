@@ -229,8 +229,57 @@ body {
 
 /* Peeps */
 .peep {
-    font-size: 1.2rem;
+    width: 0.9em;
+    height: 1.15em;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.08em;
     position: relative;
+    vertical-align: middle;
+}
+
+.peep-head,
+.peep-body {
+    display: block;
+    background: currentColor;
+}
+
+.peep-head {
+    width: 0.38em;
+    height: 0.38em;
+    border-radius: 50%;
+}
+
+.peep-body {
+    width: 0.68em;
+    height: 0.52em;
+    border-radius: 0.28em 0.28em 0.18em 0.18em;
+    position: relative;
+}
+
+.peep-body::before,
+.peep-body::after {
+    content: '';
+    position: absolute;
+    bottom: -0.18em;
+    width: 0.16em;
+    height: 0.24em;
+    background: currentColor;
+    border-radius: 0 0 0.12em 0.12em;
+}
+
+.peep-body::before {
+    left: 0.14em;
+}
+
+.peep-body::after {
+    right: 0.14em;
+}
+
+.peep-inline {
+    margin-right: 0.28em;
 }
 
 .peep.peep-moved {
@@ -241,8 +290,8 @@ body {
 .peep.has-umbrella::after {
     content: '☂️';
     position: absolute;
-    top: -8px;
-    right: -8px;
+    top: -0.45em;
+    right: -0.55em;
     font-size: 0.6rem;
 }
 

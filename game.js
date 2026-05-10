@@ -2,8 +2,42 @@
 // Raining Balloons - Game Logic
 // ==============================
 
-const PLAYER_EMOJIS = ['🔴', '🔵', '🟢', '🟡'];
 const PLAYER_NAMES = ['Red', 'Blue', 'Green', 'Yellow'];
+function getPeepClassName(playerIndex, extraClass = '') {
+    const classNames = ['peep', `player-${playerIndex + 1}`];
+    if (extraClass) classNames.push(extraClass);
+    return classNames.join(' ');
+}
+
+function getPeepIconHTML(playerIndex, extraClass = '') {
+    const className = getPeepClassName(playerIndex, extraClass);
+    return `<span class="${className}" aria-hidden="true"><span class="peep-head"></span><span class="peep-body"></span></span>`;
+}
+
+function createPeepIcon(playerIndex, extraClass = '') {
+    const peep = document.createElement('span');
+    peep.className = getPeepClassName(playerIndex, extraClass);
+    peep.setAttribute('aria-hidden', 'true');
+
+    const head = document.createElement('span');
+    head.className = 'peep-head';
+    peep.appendChild(head);
+
+    const body = document.createElement('span');
+    body.className = 'peep-body';
+    peep.appendChild(body);
+
+    return peep;
+}
+
+function appendPlayerLabel(container, playerIndex, label = PLAYER_NAMES[playerIndex]) {
+    container.appendChild(createPeepIcon(playerIndex, 'peep-inline'));
+    const labelText = document.createElement('span');
+    labelText.className = 'player-label-text';
+    labelText.textContent = label;
+    container.appendChild(labelText);
+}
+
 const CARD_TYPES = {
     MOVE: 'move',
     UMBRELLA: 'umbrella',
@@ -148,7 +182,7 @@ function updatePlayerTypeOptions() {
 
         const label = document.createElement('span');
         label.className = `player-type-label player-${i + 1}`;
-        label.textContent = `${PLAYER_EMOJIS[i]} ${PLAYER_NAMES[i]}`;
+        appendPlayerLabel(label, i);
         row.appendChild(label);
 
         if (i === 0) {
@@ -314,9 +348,7 @@ function renderBoard() {
                 cell.classList.add('bunker');
                 if (bunker.occupant) {
                     const p = bunker.occupant.playerIndex;
-                    const peepEl = document.createElement('span');
-                    peepEl.className = `peep player-${p + 1}`;
-                    peepEl.textContent = PLAYER_EMOJIS[p];
+                    const peepEl = createPeepIcon(p);
                     cell.appendChild(peepEl);
                     // Show turns remaining
                     const badge = document.createElement('span');
@@ -335,15 +367,13 @@ function renderBoard() {
             state.players.forEach((player, pi) => {
                 player.peeps.forEach((peep, peepIdx) => {
                     if (peep.alive && peep.row === r && peep.col === c && !peep.inBunker) {
-                        const peepEl = document.createElement('span');
-                        peepEl.className = `peep player-${pi + 1}`;
+                        const peepEl = createPeepIcon(pi);
                         if (peep.hasUmbrella) peepEl.classList.add('has-umbrella');
                         // Dim peeps that have already moved this turn
                         if (pi === state.currentPlayerIndex &&
                             state.peepsMoved && state.peepsMoved.includes(peepIdx)) {
                             peepEl.classList.add('peep-moved');
                         }
-                        peepEl.textContent = PLAYER_EMOJIS[pi];
                         cell.appendChild(peepEl);
                     }
                 });
@@ -375,15 +405,32 @@ function renderPlayerStatus() {
         const umbrellas = alivePeeps.filter(p => p.hasUmbrella).length;
         const inBunkers = alivePeeps.filter(p => p.inBunker).length;
 
-        card.innerHTML = `
-            <h4 class="player-${i + 1}">${PLAYER_EMOJIS[i]} ${PLAYER_NAMES[i]}${isAI(i) ? ' <span class="ai-badge">🤖</span>' : ''}</h4>
-            <div class="peep-list">
-                Peeps: ${alivePeeps.length}/3
-                ${umbrellas ? ` | ☂️×${umbrellas}` : ''}
-                ${inBunkers ? ` | 🏠×${inBunkers}` : ''}
-            </div>
-            ${state.redoQueue.includes(i) ? '<span class="redo-badge">🔄 Redo Ready</span>' : ''}
-        `;
+        const heading = document.createElement('h4');
+        heading.className = `player-${i + 1}`;
+        appendPlayerLabel(heading, i);
+        if (isAI(i)) {
+            const aiBadge = document.createElement('span');
+            aiBadge.className = 'ai-badge';
+            aiBadge.textContent = '🤖';
+            heading.append(' ');
+            heading.appendChild(aiBadge);
+        }
+
+        const peepList = document.createElement('div');
+        peepList.className = 'peep-list';
+        peepList.textContent = `Peeps: ${alivePeeps.length}/3`;
+        if (umbrellas) peepList.append(` | ☂️×${umbrellas}`);
+        if (inBunkers) peepList.append(` | 🏠×${inBunkers}`);
+
+        card.appendChild(heading);
+        card.appendChild(peepList);
+
+        if (state.redoQueue.includes(i)) {
+            const redoBadge = document.createElement('span');
+            redoBadge.className = 'redo-badge';
+            redoBadge.textContent = '🔄 Redo Ready';
+            card.appendChild(redoBadge);
+        }
         container.appendChild(card);
     });
 }
@@ -397,9 +444,10 @@ function renderTurnInfo() {
     } else {
         const aiTurn = isCurrentPlayerAI();
         const prefix = aiTurn ? '🤖 ' : '';
-        el.textContent = `${prefix}${PLAYER_EMOJIS[state.currentPlayerIndex]} ${PLAYER_NAMES[state.currentPlayerIndex]}'s Turn`;
+        el.textContent = prefix;
+        appendPlayerLabel(el, state.currentPlayerIndex, `${PLAYER_NAMES[state.currentPlayerIndex]}'s Turn`);
         if (state.selectionMode && !aiTurn) {
-            el.textContent += ` — ${getSelectionPrompt()}`;
+            el.append(` — ${getSelectionPrompt()}`);
         }
     }
 }
@@ -444,7 +492,10 @@ function renderCardArea() {
 
     const pName = PLAYER_NAMES[state.currentPlayerIndex];
     const pColor = playerColors[state.currentPlayerIndex];
-    if (title) title.textContent = `${PLAYER_EMOJIS[state.currentPlayerIndex]} ${pName}'s Turn`;
+    if (title) {
+        title.textContent = '';
+        appendPlayerLabel(title, state.currentPlayerIndex, `${pName}'s Turn`);
+    }
 
     if (state.turnPhase === 'draw') {
         if (isCurrentPlayerAI()) {
@@ -541,10 +592,16 @@ function renderRoundControls() {
             const info = document.getElementById('redo-deciding-info');
             if (info) {
                 const others = state.redoQueue.length - state.redoQueuePos - 1;
-                info.innerHTML = `
-                    <strong>${PLAYER_EMOJIS[decider]} ${PLAYER_NAMES[decider]}</strong> — use your Redo card?
-                    ${others > 0 ? `<small>(${others} more player${others > 1 ? 's' : ''} to decide after you)</small>` : ''}
-                `;
+                info.textContent = '';
+                const strong = document.createElement('strong');
+                appendPlayerLabel(strong, decider, PLAYER_NAMES[decider]);
+                info.appendChild(strong);
+                info.append(' — use your Redo card?');
+                if (others > 0) {
+                    const small = document.createElement('small');
+                    small.textContent = `(${others} more player${others > 1 ? 's' : ''} to decide after you)`;
+                    info.appendChild(small);
+                }
             }
             redoBtn.classList.remove('hidden');
             passBtn.textContent = '👍 Pass';
@@ -1279,7 +1336,7 @@ function animateHits(hits, onComplete) {
             el.innerHTML = `☂️<span class="hit-spray">💦</span>`;
             el.title = 'Umbrella saved!';
         } else {
-            el.innerHTML = `${PLAYER_EMOJIS[playerIndex]}<span class="hit-spray">💦</span>`;
+            el.innerHTML = `${getPeepIconHTML(playerIndex)}<span class="hit-spray">💦</span>`;
         }
 
         document.body.appendChild(el);
@@ -1301,7 +1358,7 @@ function checkWinCondition() {
         state.gameOver = true;
         setTimeout(() => {
             if (alive.length === 1) {
-                showGameOver(`${PLAYER_EMOJIS[alive[0].index]} ${PLAYER_NAMES[alive[0].index]} wins! 🎉`);
+                showGameOver(`${PLAYER_NAMES[alive[0].index]} wins! 🎉`, alive[0].index);
             } else {
                 showGameOver("It's a draw! Everyone got soaked! 💧");
             }
@@ -1388,8 +1445,14 @@ function showScreen(id) {
     document.getElementById(id).classList.add('active');
 }
 
-function showGameOver(text) {
-    document.getElementById('winner-text').textContent = text;
+function showGameOver(text, playerIndex = null) {
+    const winnerText = document.getElementById('winner-text');
+    winnerText.textContent = '';
+    if (playerIndex === null) {
+        winnerText.textContent = text;
+    } else {
+        appendPlayerLabel(winnerText, playerIndex, text);
+    }
     showScreen('gameover-screen');
 }
 
