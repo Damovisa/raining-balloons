@@ -4,12 +4,14 @@
 
 const PLAYER_NAMES = ['Red', 'Blue', 'Green', 'Yellow'];
 function escapeHtml(text) {
-    return text
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#39;');
+    const htmlEscapes = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    };
+    return text.replace(/[&<>"']/g, char => htmlEscapes[char]);
 }
 
 function getPeepClassName(playerIndex, extraClass = '') {
@@ -432,9 +434,12 @@ function renderTurnInfo() {
     } else {
         const aiTurn = isCurrentPlayerAI();
         const prefix = aiTurn ? '🤖 ' : '';
-        el.innerHTML = `${prefix}${getPlayerLabelHTML(state.currentPlayerIndex, `${PLAYER_NAMES[state.currentPlayerIndex]}'s Turn`)}`;
+        const label = document.createElement('span');
+        label.innerHTML = getPlayerLabelHTML(state.currentPlayerIndex, `${PLAYER_NAMES[state.currentPlayerIndex]}'s Turn`);
+        el.textContent = prefix;
+        el.append(...label.childNodes);
         if (state.selectionMode && !aiTurn) {
-            el.innerHTML += ` — ${getSelectionPrompt()}`;
+            el.append(` — ${getSelectionPrompt()}`);
         }
     }
 }
