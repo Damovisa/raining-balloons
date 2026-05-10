@@ -3,14 +3,18 @@
 // ==============================
 
 const PLAYER_NAMES = ['Red', 'Blue', 'Green', 'Yellow'];
+function getPeepClassName(playerIndex, extraClass = '') {
+    return ['peep', `player-${playerIndex + 1}`, extraClass].filter(Boolean).join(' ');
+}
+
 function getPeepIconHTML(playerIndex, extraClass = '') {
-    const className = `peep player-${playerIndex + 1}${extraClass ? ` ${extraClass}` : ''}`;
+    const className = getPeepClassName(playerIndex, extraClass);
     return `<span class="${className}" aria-hidden="true"><span class="peep-head"></span><span class="peep-body"></span></span>`;
 }
 
 function createPeepIcon(playerIndex, extraClass = '') {
     const peep = document.createElement('span');
-    peep.className = `peep player-${playerIndex + 1}${extraClass ? ` ${extraClass}` : ''}`;
+    peep.className = getPeepClassName(playerIndex, extraClass);
     peep.setAttribute('aria-hidden', 'true');
 
     const head = document.createElement('span');
