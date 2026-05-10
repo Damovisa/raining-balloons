@@ -3,17 +3,6 @@
 // ==============================
 
 const PLAYER_NAMES = ['Red', 'Blue', 'Green', 'Yellow'];
-function escapeHtml(text) {
-    const htmlEscapes = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#39;'
-    };
-    return text.replace(/[&<>"']/g, char => htmlEscapes[char]);
-}
-
 function getPeepClassName(playerIndex, extraClass = '') {
     const classNames = ['peep', `player-${playerIndex + 1}`];
     if (extraClass) classNames.push(extraClass);
@@ -41,8 +30,12 @@ function createPeepIcon(playerIndex, extraClass = '') {
     return peep;
 }
 
-function getPlayerLabelHTML(playerIndex, label = PLAYER_NAMES[playerIndex]) {
-    return `${getPeepIconHTML(playerIndex, 'peep-inline')} <span class="player-label-text">${escapeHtml(label)}</span>`;
+function appendPlayerLabel(container, playerIndex, label = PLAYER_NAMES[playerIndex]) {
+    container.appendChild(createPeepIcon(playerIndex, 'peep-inline'));
+    const labelText = document.createElement('span');
+    labelText.className = 'player-label-text';
+    labelText.textContent = label;
+    container.appendChild(labelText);
 }
 
 const CARD_TYPES = {
@@ -189,7 +182,7 @@ function updatePlayerTypeOptions() {
 
         const label = document.createElement('span');
         label.className = `player-type-label player-${i + 1}`;
-        label.innerHTML = getPlayerLabelHTML(i);
+        appendPlayerLabel(label, i);
         row.appendChild(label);
 
         if (i === 0) {
@@ -412,15 +405,32 @@ function renderPlayerStatus() {
         const umbrellas = alivePeeps.filter(p => p.hasUmbrella).length;
         const inBunkers = alivePeeps.filter(p => p.inBunker).length;
 
-        card.innerHTML = `
-            <h4 class="player-${i + 1}">${getPlayerLabelHTML(i)}${isAI(i) ? ' <span class="ai-badge">🤖</span>' : ''}</h4>
-            <div class="peep-list">
-                Peeps: ${alivePeeps.length}/3
-                ${umbrellas ? ` | ☂️×${umbrellas}` : ''}
-                ${inBunkers ? ` | 🏠×${inBunkers}` : ''}
-            </div>
-            ${state.redoQueue.includes(i) ? '<span class="redo-badge">🔄 Redo Ready</span>' : ''}
-        `;
+        const heading = document.createElement('h4');
+        heading.className = `player-${i + 1}`;
+        appendPlayerLabel(heading, i);
+        if (isAI(i)) {
+            const aiBadge = document.createElement('span');
+            aiBadge.className = 'ai-badge';
+            aiBadge.textContent = '🤖';
+            heading.append(' ');
+            heading.appendChild(aiBadge);
+        }
+
+        const peepList = document.createElement('div');
+        peepList.className = 'peep-list';
+        peepList.textContent = `Peeps: ${alivePeeps.length}/3`;
+        if (umbrellas) peepList.append(` | ☂️×${umbrellas}`);
+        if (inBunkers) peepList.append(` | 🏠×${inBunkers}`);
+
+        card.appendChild(heading);
+        card.appendChild(peepList);
+
+        if (state.redoQueue.includes(i)) {
+            const redoBadge = document.createElement('span');
+            redoBadge.className = 'redo-badge';
+            redoBadge.textContent = '🔄 Redo Ready';
+            card.appendChild(redoBadge);
+        }
         container.appendChild(card);
     });
 }
@@ -434,10 +444,8 @@ function renderTurnInfo() {
     } else {
         const aiTurn = isCurrentPlayerAI();
         const prefix = aiTurn ? '🤖 ' : '';
-        const label = document.createElement('span');
-        label.innerHTML = getPlayerLabelHTML(state.currentPlayerIndex, `${PLAYER_NAMES[state.currentPlayerIndex]}'s Turn`);
         el.textContent = prefix;
-        el.append(...label.childNodes);
+        appendPlayerLabel(el, state.currentPlayerIndex, `${PLAYER_NAMES[state.currentPlayerIndex]}'s Turn`);
         if (state.selectionMode && !aiTurn) {
             el.append(` — ${getSelectionPrompt()}`);
         }
@@ -484,7 +492,10 @@ function renderCardArea() {
 
     const pName = PLAYER_NAMES[state.currentPlayerIndex];
     const pColor = playerColors[state.currentPlayerIndex];
-    if (title) title.innerHTML = getPlayerLabelHTML(state.currentPlayerIndex, `${pName}'s Turn`);
+    if (title) {
+        title.textContent = '';
+        appendPlayerLabel(title, state.currentPlayerIndex, `${pName}'s Turn`);
+    }
 
     if (state.turnPhase === 'draw') {
         if (isCurrentPlayerAI()) {
@@ -581,10 +592,16 @@ function renderRoundControls() {
             const info = document.getElementById('redo-deciding-info');
             if (info) {
                 const others = state.redoQueue.length - state.redoQueuePos - 1;
-                info.innerHTML = `
-                    <strong>${getPlayerLabelHTML(decider, PLAYER_NAMES[decider])}</strong> — use your Redo card?
-                    ${others > 0 ? `<small>(${others} more player${others > 1 ? 's' : ''} to decide after you)</small>` : ''}
-                `;
+                info.textContent = '';
+                const strong = document.createElement('strong');
+                appendPlayerLabel(strong, decider, PLAYER_NAMES[decider]);
+                info.appendChild(strong);
+                info.append(' — use your Redo card?');
+                if (others > 0) {
+                    const small = document.createElement('small');
+                    small.textContent = `(${others} more player${others > 1 ? 's' : ''} to decide after you)`;
+                    info.appendChild(small);
+                }
             }
             redoBtn.classList.remove('hidden');
             passBtn.textContent = '👍 Pass';
@@ -1341,7 +1358,7 @@ function checkWinCondition() {
         state.gameOver = true;
         setTimeout(() => {
             if (alive.length === 1) {
-                showGameOver(getPlayerLabelHTML(alive[0].index, `${PLAYER_NAMES[alive[0].index]} wins! 🎉`));
+                showGameOver(`${PLAYER_NAMES[alive[0].index]} wins! 🎉`, alive[0].index);
             } else {
                 showGameOver("It's a draw! Everyone got soaked! 💧");
             }
@@ -1428,8 +1445,14 @@ function showScreen(id) {
     document.getElementById(id).classList.add('active');
 }
 
-function showGameOver(text) {
-    document.getElementById('winner-text').innerHTML = text;
+function showGameOver(text, playerIndex = null) {
+    const winnerText = document.getElementById('winner-text');
+    winnerText.textContent = '';
+    if (playerIndex === null) {
+        winnerText.textContent = text;
+    } else {
+        appendPlayerLabel(winnerText, playerIndex, text);
+    }
     showScreen('gameover-screen');
 }
 
