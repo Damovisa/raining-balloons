@@ -1325,7 +1325,7 @@ function checkWinCondition() {
         state.gameOver = true;
         setTimeout(() => {
             if (alive.length === 1) {
-                showGameOver(`${getPlayerLabelHTML(alive[0].index, `${PLAYER_NAMES[alive[0].index]} wins! 🎉`)}`);
+                showGameOver(getPlayerLabelHTML(alive[0].index, `${PLAYER_NAMES[alive[0].index]} wins! 🎉`));
             } else {
                 showGameOver("It's a draw! Everyone got soaked! 💧");
             }
