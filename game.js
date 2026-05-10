@@ -4,7 +4,9 @@
 
 const PLAYER_NAMES = ['Red', 'Blue', 'Green', 'Yellow'];
 function getPeepClassName(playerIndex, extraClass = '') {
-    return ['peep', `player-${playerIndex + 1}`, extraClass].filter(Boolean).join(' ');
+    const classNames = ['peep', `player-${playerIndex + 1}`];
+    if (extraClass) classNames.push(extraClass);
+    return classNames.join(' ');
 }
 
 function getPeepIconHTML(playerIndex, extraClass = '') {
@@ -29,7 +31,7 @@ function createPeepIcon(playerIndex, extraClass = '') {
 }
 
 function getPlayerLabelHTML(playerIndex, label = PLAYER_NAMES[playerIndex]) {
-    return `${getPeepIconHTML(playerIndex, 'peep-inline')}${label}`;
+    return `${getPeepIconHTML(playerIndex, 'peep-inline')} <span class="player-label-text">${label}</span>`;
 }
 
 const CARD_TYPES = {
