@@ -2,8 +2,32 @@
 // Raining Balloons - Game Logic
 // ==============================
 
-const PLAYER_EMOJIS = ['🔴', '🔵', '🟢', '🟡'];
 const PLAYER_NAMES = ['Red', 'Blue', 'Green', 'Yellow'];
+function getPeepIconHTML(playerIndex, extraClass = '') {
+    const className = `peep player-${playerIndex + 1}${extraClass ? ` ${extraClass}` : ''}`;
+    return `<span class="${className}" aria-hidden="true"><span class="peep-head"></span><span class="peep-body"></span></span>`;
+}
+
+function createPeepIcon(playerIndex, extraClass = '') {
+    const peep = document.createElement('span');
+    peep.className = `peep player-${playerIndex + 1}${extraClass ? ` ${extraClass}` : ''}`;
+    peep.setAttribute('aria-hidden', 'true');
+
+    const head = document.createElement('span');
+    head.className = 'peep-head';
+    peep.appendChild(head);
+
+    const body = document.createElement('span');
+    body.className = 'peep-body';
+    peep.appendChild(body);
+
+    return peep;
+}
+
+function getPlayerLabelHTML(playerIndex, label = PLAYER_NAMES[playerIndex]) {
+    return `${getPeepIconHTML(playerIndex, 'peep-inline')}${label}`;
+}
+
 const CARD_TYPES = {
     MOVE: 'move',
     UMBRELLA: 'umbrella',
@@ -148,7 +172,7 @@ function updatePlayerTypeOptions() {
 
         const label = document.createElement('span');
         label.className = `player-type-label player-${i + 1}`;
-        label.textContent = `${PLAYER_EMOJIS[i]} ${PLAYER_NAMES[i]}`;
+        label.innerHTML = getPlayerLabelHTML(i);
         row.appendChild(label);
 
         if (i === 0) {
@@ -314,9 +338,7 @@ function renderBoard() {
                 cell.classList.add('bunker');
                 if (bunker.occupant) {
                     const p = bunker.occupant.playerIndex;
-                    const peepEl = document.createElement('span');
-                    peepEl.className = `peep player-${p + 1}`;
-                    peepEl.textContent = PLAYER_EMOJIS[p];
+                    const peepEl = createPeepIcon(p);
                     cell.appendChild(peepEl);
                     // Show turns remaining
                     const badge = document.createElement('span');
@@ -335,15 +357,13 @@ function renderBoard() {
             state.players.forEach((player, pi) => {
                 player.peeps.forEach((peep, peepIdx) => {
                     if (peep.alive && peep.row === r && peep.col === c && !peep.inBunker) {
-                        const peepEl = document.createElement('span');
-                        peepEl.className = `peep player-${pi + 1}`;
+                        const peepEl = createPeepIcon(pi);
                         if (peep.hasUmbrella) peepEl.classList.add('has-umbrella');
                         // Dim peeps that have already moved this turn
                         if (pi === state.currentPlayerIndex &&
                             state.peepsMoved && state.peepsMoved.includes(peepIdx)) {
                             peepEl.classList.add('peep-moved');
                         }
-                        peepEl.textContent = PLAYER_EMOJIS[pi];
                         cell.appendChild(peepEl);
                     }
                 });
@@ -376,7 +396,7 @@ function renderPlayerStatus() {
         const inBunkers = alivePeeps.filter(p => p.inBunker).length;
 
         card.innerHTML = `
-            <h4 class="player-${i + 1}">${PLAYER_EMOJIS[i]} ${PLAYER_NAMES[i]}${isAI(i) ? ' <span class="ai-badge">🤖</span>' : ''}</h4>
+            <h4 class="player-${i + 1}">${getPlayerLabelHTML(i)}${isAI(i) ? ' <span class="ai-badge">🤖</span>' : ''}</h4>
             <div class="peep-list">
                 Peeps: ${alivePeeps.length}/3
                 ${umbrellas ? ` | ☂️×${umbrellas}` : ''}
@@ -397,9 +417,9 @@ function renderTurnInfo() {
     } else {
         const aiTurn = isCurrentPlayerAI();
         const prefix = aiTurn ? '🤖 ' : '';
-        el.textContent = `${prefix}${PLAYER_EMOJIS[state.currentPlayerIndex]} ${PLAYER_NAMES[state.currentPlayerIndex]}'s Turn`;
+        el.innerHTML = `${prefix}${getPlayerLabelHTML(state.currentPlayerIndex, `${PLAYER_NAMES[state.currentPlayerIndex]}'s Turn`)}`;
         if (state.selectionMode && !aiTurn) {
-            el.textContent += ` — ${getSelectionPrompt()}`;
+            el.innerHTML += ` — ${getSelectionPrompt()}`;
         }
     }
 }
@@ -444,7 +464,7 @@ function renderCardArea() {
 
     const pName = PLAYER_NAMES[state.currentPlayerIndex];
     const pColor = playerColors[state.currentPlayerIndex];
-    if (title) title.textContent = `${PLAYER_EMOJIS[state.currentPlayerIndex]} ${pName}'s Turn`;
+    if (title) title.innerHTML = getPlayerLabelHTML(state.currentPlayerIndex, `${pName}'s Turn`);
 
     if (state.turnPhase === 'draw') {
         if (isCurrentPlayerAI()) {
@@ -542,7 +562,7 @@ function renderRoundControls() {
             if (info) {
                 const others = state.redoQueue.length - state.redoQueuePos - 1;
                 info.innerHTML = `
-                    <strong>${PLAYER_EMOJIS[decider]} ${PLAYER_NAMES[decider]}</strong> — use your Redo card?
+                    <strong>${getPlayerLabelHTML(decider, PLAYER_NAMES[decider])}</strong> — use your Redo card?
                     ${others > 0 ? `<small>(${others} more player${others > 1 ? 's' : ''} to decide after you)</small>` : ''}
                 `;
             }
@@ -1279,7 +1299,7 @@ function animateHits(hits, onComplete) {
             el.innerHTML = `☂️<span class="hit-spray">💦</span>`;
             el.title = 'Umbrella saved!';
         } else {
-            el.innerHTML = `${PLAYER_EMOJIS[playerIndex]}<span class="hit-spray">💦</span>`;
+            el.innerHTML = `${getPeepIconHTML(playerIndex)}<span class="hit-spray">💦</span>`;
         }
 
         document.body.appendChild(el);
@@ -1301,7 +1321,7 @@ function checkWinCondition() {
         state.gameOver = true;
         setTimeout(() => {
             if (alive.length === 1) {
-                showGameOver(`${PLAYER_EMOJIS[alive[0].index]} ${PLAYER_NAMES[alive[0].index]} wins! 🎉`);
+                showGameOver(`${getPlayerLabelHTML(alive[0].index, `${PLAYER_NAMES[alive[0].index]} wins! 🎉`)}`);
             } else {
                 showGameOver("It's a draw! Everyone got soaked! 💧");
             }
@@ -1389,7 +1409,7 @@ function showScreen(id) {
 }
 
 function showGameOver(text) {
-    document.getElementById('winner-text').textContent = text;
+    document.getElementById('winner-text').innerHTML = text;
     showScreen('gameover-screen');
 }
 
