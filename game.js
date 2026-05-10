@@ -3,6 +3,15 @@
 // ==============================
 
 const PLAYER_NAMES = ['Red', 'Blue', 'Green', 'Yellow'];
+function escapeHtml(text) {
+    return text
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
+
 function getPeepClassName(playerIndex, extraClass = '') {
     const classNames = ['peep', `player-${playerIndex + 1}`];
     if (extraClass) classNames.push(extraClass);
@@ -31,7 +40,7 @@ function createPeepIcon(playerIndex, extraClass = '') {
 }
 
 function getPlayerLabelHTML(playerIndex, label = PLAYER_NAMES[playerIndex]) {
-    return `${getPeepIconHTML(playerIndex, 'peep-inline')} <span class="player-label-text">${label}</span>`;
+    return `${getPeepIconHTML(playerIndex, 'peep-inline')} <span class="player-label-text">${escapeHtml(label)}</span>`;
 }
 
 const CARD_TYPES = {
