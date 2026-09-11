@@ -11,7 +11,7 @@
         <!-- Setup Screen -->
         <div id="setup-screen" class="screen active">
             <h1>🎈 Raining Balloons 💧</h1>
-            <p class="subtitle">Don't get soaked!</p>
+            <p class="subtitle">A little rain. A lot of running.</p>
             <div class="setup-form">
                 <div class="form-group">
                     <label>Number of Players</label>
@@ -50,27 +50,37 @@
         <!-- Game Screen -->
         <div id="game-screen" class="screen">
             <div class="game-header">
-                <h2 id="game-title">🎈 Raining Balloons</h2>
+                <div>
+                    <p class="eyebrow">THE TABLETOP EDITION</p>
+                    <h2 id="game-title">🎈 Raining Balloons</h2>
+                </div>
                 <div id="round-info">Round <span id="round-num">1</span></div>
             </div>
             <div class="game-layout">
                 <div class="left-panel">
+                    <h3 class="panel-label">THE PLAYERS</h3>
                     <div id="player-status"></div>
                 </div>
                 <div class="center-panel">
-                    <div id="board"></div>
-                    <div id="turn-info"></div>
+                    <div class="board-stage">
+                        <div class="board-caption"><span>RAIN GARDEN</span><span>8 × 8</span></div>
+                        <div id="board"></div>
+                        <button id="reset-camera" class="hidden" type="button" title="Reset to the default 70° view" aria-label="Reset camera">↺ Reset view</button>
+                        <p id="camera-hint" class="camera-hint">Drag to orbit · Click a tile to play · Arrow keys + Enter to select</p>
+                    </div>
+                    <div id="turn-info" role="status" aria-live="polite"></div>
                 </div>
                 <div class="right-panel">
+                    <p class="panel-label">YOUR CARD TABLE</p>
                     <div id="card-area">
                         <h3 id="card-area-title">Card Deck</h3>
                         <div id="card-deck-wrapper">
-                            <div id="card-deck" class="card-deck" title="Click deck to draw">
-                                <div class="deck-layer"></div>
-                                <div class="deck-layer"></div>
-                                <div class="deck-layer"></div>
-                                <div class="deck-top">🎴</div>
-                            </div>
+                            <button id="card-deck" class="card-deck" type="button" title="Click deck to draw" aria-label="Draw a card">
+                                <span class="deck-layer"></span>
+                                <span class="deck-layer"></span>
+                                <span class="deck-layer"></span>
+                                <span class="deck-top">🎈</span>
+                            </button>
                             <div class="deck-count-label"><span id="deck-count">36</span> cards left</div>
                         </div>
                         <div id="drawn-card" class="card-display empty">
@@ -106,6 +116,7 @@
 
     <div id="toast" class="toast hidden"></div>
 
+    <script type="module" src="board3d.js"></script>
     <script src="game.js"></script>
 </body>
 </html>

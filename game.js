@@ -130,6 +130,9 @@ let state = {
     redoQueuePos: 0     // which position in redoQueue is currently deciding
 };
 
+let board3D = null;
+let board3DAttempted = false;
+
 // ==============================
 // Setup
 // ==============================
@@ -146,6 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('redo-btn').addEventListener('click', useRedo);
     document.getElementById('accept-drop-btn').addEventListener('click', passRedo);
     document.getElementById('play-again-btn').addEventListener('click', () => location.reload());
+    document.getElementById('reset-camera').addEventListener('click', () => board3D?.reset());
 });
 
 function setupOptionButtons() {
@@ -327,12 +331,41 @@ function renderAll() {
 }
 
 function renderBoard() {
+    if (!board3DAttempted) {
+        board3DAttempted = true;
+        if (window.Board3D) {
+            try {
+                board3D = new window.Board3D(document.getElementById('board'), {
+                    onCellClick,
+                    onCameraChange: changed => {
+                        document.getElementById('reset-camera').classList.toggle('hidden', !changed);
+                    }
+                });
+                document.getElementById('board').classList.add('board-3d');
+            } catch (error) {
+                console.warn('3D rendering unavailable; using the accessible flat board.', error);
+            }
+        }
+        if (!board3D) {
+            document.getElementById('camera-hint').textContent = '3D unavailable on this device — playing in flat-board mode.';
+        }
+    }
+    if (board3D) {
+        board3D.render(state);
+        return;
+    }
+    renderFlatBoard();
+}
+
+function renderFlatBoard() {
     const boardEl = document.getElementById('board');
     boardEl.innerHTML = '';
 
     for (let r = 0; r < 8; r++) {
         for (let c = 0; c < 8; c++) {
-            const cell = document.createElement('div');
+            const cell = document.createElement('button');
+            cell.type = 'button';
+            cell.setAttribute('aria-label', `Row ${r + 1}, column ${c + 1}`);
             cell.className = 'cell';
             cell.dataset.row = r;
             cell.dataset.col = c;
@@ -476,6 +509,7 @@ function renderCardArea() {
     const playerColors = ['#E74C3C', '#3498DB', '#27AE60', '#F39C12'];
 
     const isMoving = state.selectionMode === 'select_peep_move' || state.selectionMode === 'select_move_target';
+    if (deck) deck.disabled = state.turnPhase !== 'draw' || state.gameOver || isCurrentPlayerAI();
 
     if (isRoundEndPhase() || state.gameOver) {
         if (deck) deck.classList.add('deck-disabled');
@@ -631,7 +665,10 @@ function drawCard() {
     if (state.turnPhase !== 'draw') return;
 
     const deckEl = document.getElementById('card-deck');
-    if (deckEl) deckEl.classList.add('deck-disabled');
+    if (deckEl) {
+        deckEl.classList.add('deck-disabled');
+        deckEl.disabled = true;
+    }
 
     if (state.deck.length === 0) state.deck = buildDeck();
     const card = state.deck.pop();
@@ -1311,6 +1348,10 @@ function enforceBunkerCap() {
 
 // Animate each hit peep: splash burst floating up, then callback
 function animateHits(hits, onComplete) {
+    if (board3D) {
+        board3D.animateHits(hits, onComplete);
+        return;
+    }
     const board = document.getElementById('board');
     if (!board) { onComplete(); return; }
 

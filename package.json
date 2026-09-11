@@ -1,0 +1,18 @@
+{
+  "name": "raining-balloons",
+  "version": "1.0.0",
+  "description": "A 3D tabletop game of falling water balloons and last-minute shelter.",
+  "private": true,
+  "scripts": {
+    "build": "mkdir -p dist/vendor && cp index.html style.css game.js board3d.js dist/ && cp node_modules/three/build/three.module.js node_modules/three/build/three.core.js node_modules/three/LICENSE dist/vendor/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Damovisa/raining-balloons"
+  },
+  "keywords": [],
+  "author": "",
+  "dependencies": {
+    "three": "0.186.0"
+  }
+}
