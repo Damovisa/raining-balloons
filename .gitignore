@@ -10,3 +10,12 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Dependencies and generated static site
+node_modules/
+dist/
+
+# Local browser verification artifacts
+.b/
+.browser-work/
+raining-balloons-3d.png
