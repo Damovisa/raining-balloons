@@ -949,7 +949,6 @@ window.Board3D = class Board3D {
         this.clearEffects();
         this.people.clear();
         this.bunkers.clear();
-        this.scene.traverse(object => object.shadow?.dispose());
         this.scene.clear();
         for (const geometry of this.geometries.values()) geometry.dispose();
         for (const material of this.materials.values()) material.dispose();
