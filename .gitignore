@@ -19,3 +19,5 @@ dist/
 .b/
 .browser-work/
 raining-balloons-3d.png
+playwright-report/
+test-results/

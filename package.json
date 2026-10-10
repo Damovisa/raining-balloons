@@ -4,7 +4,8 @@
   "description": "A 3D tabletop game of falling water balloons and last-minute shelter.",
   "private": true,
   "scripts": {
-    "build": "mkdir -p dist/vendor && cp index.html style.css game.js board3d.js dist/ && cp node_modules/three/build/three.module.js node_modules/three/build/three.core.js node_modules/three/LICENSE dist/vendor/"
+    "build": "mkdir -p dist/vendor && cp index.html style.css game.js board3d.js dist/ && cp node_modules/three/build/three.module.js node_modules/three/build/three.core.js node_modules/three/LICENSE dist/vendor/",
+    "test": "playwright test"
   },
   "repository": {
     "type": "git",
@@ -14,5 +15,8 @@
   "author": "",
   "dependencies": {
     "three": "0.186.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0"
   }
 }
